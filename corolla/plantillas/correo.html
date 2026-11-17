@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>{{ c.asunto }}</title>
+</head>
+{%- set fuente = "-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" -%}
+{%- macro titulo_seccion(texto) -%}
+<tr><td style="padding:28px 0 10px 0;font-family:{{ fuente }};font-size:15px;font-weight:600;color:#0b0b0b;">{{ texto }}</td></tr>
+{%- endmacro -%}
+<body style="margin:0;padding:0;background:#f4f4f1;">
+<div style="display:none;max-height:0;overflow:hidden;color:#f4f4f1;">{{ c.preheader }}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f1;">
+<tr><td align="center" style="padding:24px 12px;">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="width:100%;max-width:640px;background:#ffffff;border:1px solid #e1e0d9;border-radius:10px;">
+<tr><td style="padding:28px 28px 8px 28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+
+  <tr><td style="font-family:{{ fuente }};font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:#898781;">Monitor de Carroya · Toyota Corolla 2022 a 2026</td></tr>
+  <tr><td style="padding-top:6px;font-family:{{ fuente }};font-size:22px;font-weight:600;color:#0b0b0b;">Reporte del {{ c.fecha_larga }}</td></tr>
+  <tr><td style="padding-top:12px;">
+    <span style="display:inline-block;padding:5px 12px;border-radius:999px;background:{{ c.estado.fondo }};color:{{ c.estado.texto }};font-family:{{ fuente }};font-size:13px;font-weight:600;">{{ c.estado.icono }}&nbsp; {{ c.estado.etiqueta }}</span>
+  </td></tr>
+  <tr><td style="padding-top:10px;font-family:{{ fuente }};font-size:14px;line-height:1.5;color:#52514e;">{{ c.estado.descripcion }}</td></tr>
+
+  {%- if c.banner_modo %}
+  <tr><td style="padding-top:16px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#fff6e0;border:1px solid #f3d27a;border-radius:8px;">
+      <tr><td style="padding:12px 14px;font-family:{{ fuente }};font-size:13px;line-height:1.5;color:#0b0b0b;"><strong>{{ c.banner_modo.titulo }}</strong>. {{ c.banner_modo.texto }}</td></tr>
+    </table>
+  </td></tr>
+  {%- endif %}
+
+  <tr><td style="padding-top:20px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+    {%- for k in c.kpis %}
+      <td width="25%" valign="top" style="padding:{{ '0 6px 0 0' if loop.first else ('0 0 0 6px' if loop.last else '0 6px') }};">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f9f9f7;border:1px solid #e1e0d9;border-radius:8px;">
+          <tr><td style="padding:12px 12px 2px 12px;font-family:{{ fuente }};font-size:22px;font-weight:600;color:#0b0b0b;">{{ k.valor }}</td></tr>
+          <tr><td style="padding:0 12px 12px 12px;font-family:{{ fuente }};font-size:12px;line-height:1.35;color:#52514e;">{{ k.etiqueta }}</td></tr>
+        </table>
+      </td>
+    {%- endfor %}
+    </tr></table>
+  </td></tr>
+
+  {{ titulo_seccion("Estado de la ejecución") }}
+  <tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e1e0d9;">
+    {%- for fila in c.ejecucion %}
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#52514e;width:52%;">{{ fila.etiqueta }}</td>
+        <td style="padding:8px 0;border-bottom:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#0b0b0b;text-align:right;">{{ fila.valor }}</td>
+      </tr>
+    {%- endfor %}
+    </table>
+  </td></tr>
+
+  {{ titulo_seccion("Errores relevantes y etapas pendientes") }}
+  <tr><td style="font-family:{{ fuente }};font-size:13px;line-height:1.55;color:#0b0b0b;">
+    {%- if c.errores or c.pendientes %}
+      <ul style="margin:0;padding-left:18px;">
+      {%- for e in c.pendientes %}<li style="margin-bottom:4px;">Etapa pendiente o con error, {{ e }}</li>{% endfor %}
+      {%- for e in c.errores %}<li style="margin-bottom:4px;">{{ e }}</li>{% endfor %}
+      </ul>
+    {%- else %}
+      <span style="color:#52514e;">Sin errores relevantes. Todas las etapas terminaron.</span>
+    {%- endif %}
+  </td></tr>
+
+  {{ titulo_seccion("Distribución de precios del día") }}
+  {%- if c.distribucion.grafica_cid %}
+  <tr><td><img src="cid:{{ c.distribucion.grafica_cid }}" width="584" alt="Histograma de precios y precios por año del modelo" style="display:block;width:100%;max-width:584px;height:auto;border:0;"></td></tr>
+  {%- else %}
+  <tr><td style="font-family:{{ fuente }};font-size:13px;line-height:1.5;color:#52514e;">No hay gráfica hoy porque {{ c.distribucion.motivo }}.</td></tr>
+  {%- endif %}
+  {%- if c.distribucion.filas %}
+  <tr><td style="padding-top:12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e1e0d9;">
+    {%- for fila in c.distribucion.filas %}
+      <tr>
+        <td style="padding:7px 0;border-bottom:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#52514e;">{{ fila.etiqueta }}</td>
+        <td style="padding:7px 0;border-bottom:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#0b0b0b;text-align:right;font-variant-numeric:tabular-nums;">{{ fila.valor }}</td>
+      </tr>
+    {%- endfor %}
+    </table>
+  </td></tr>
+  {%- endif %}
+  {%- if c.distribucion.por_anio %}
+  <tr><td style="padding-top:14px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="padding:6px 0;font-family:{{ fuente }};font-size:12px;color:#898781;">Año del modelo</td>
+        <td style="padding:6px 0;font-family:{{ fuente }};font-size:12px;color:#898781;text-align:right;">Anuncios</td>
+        <td style="padding:6px 0;font-family:{{ fuente }};font-size:12px;color:#898781;text-align:right;">Mediana</td>
+      </tr>
+      {%- for a in c.distribucion.por_anio %}
+      <tr>
+        <td style="padding:6px 0;border-top:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#0b0b0b;">{{ a.anio }}</td>
+        <td style="padding:6px 0;border-top:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#0b0b0b;text-align:right;font-variant-numeric:tabular-nums;">{{ a.n }}</td>
+        <td style="padding:6px 0;border-top:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;color:#0b0b0b;text-align:right;font-variant-numeric:tabular-nums;">{{ a.mediana }}</td>
+      </tr>
+      {%- endfor %}
+    </table>
+  </td></tr>
+  {%- endif %}
+
+  {{ titulo_seccion("Posibles gangas entre los anuncios nuevos de hoy") }}
+  {%- if c.primera_ejecucion %}
+  <tr><td style="padding-bottom:10px;font-family:{{ fuente }};font-size:13px;line-height:1.5;color:#52514e;">Es la primera ejecución del sistema, así que todos los anuncios son nuevos para él y todavía no se pueden detectar bajadas de precio.</td></tr>
+  {%- endif %}
+  {%- for g in c.gangas %}
+  <tr><td style="padding-bottom:14px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e1e0d9;border-left:4px solid #eb6834;border-radius:8px;">
+      <tr><td style="padding:14px 16px 4px 16px;font-family:{{ fuente }};font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:#52514e;">{{ '⚠ ' if g.sospechoso else '★ ' }}{{ g.etiqueta }}</td></tr>
+      <tr><td style="padding:0 16px;font-family:{{ fuente }};font-size:15px;font-weight:600;line-height:1.4;"><a href="{{ g.url }}" style="color:#1c5cab;text-decoration:none;">{{ g.titulo }}</a></td></tr>
+      <tr><td style="padding:8px 16px 0 16px;font-family:{{ fuente }};font-size:12px;line-height:1.9;color:#52514e;">
+        {%- for rasgo in g.caracteristicas %}<span style="display:inline-block;margin:0 6px 4px 0;padding:1px 8px;border:1px solid #e1e0d9;border-radius:999px;white-space:nowrap;">{{ rasgo }}</span>{% endfor %}
+      </td></tr>
+      <tr><td style="padding:8px 16px 0 16px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+          <td valign="top" width="34%" style="font-family:{{ fuente }};">
+            <div style="font-size:12px;color:#898781;">Precio publicado</div>
+            <div style="font-size:18px;font-weight:600;color:#0b0b0b;">{{ g.precio }}</div>
+          </td>
+          <td valign="top" width="33%" style="font-family:{{ fuente }};">
+            <div style="font-size:12px;color:#898781;">Precio esperado</div>
+            <div style="font-size:18px;font-weight:600;color:#0b0b0b;">{{ g.esperado }}</div>
+          </td>
+          <td valign="top" width="33%" style="font-family:{{ fuente }};">
+            <div style="font-size:12px;color:#898781;">Diferencia</div>
+            <div style="font-size:18px;font-weight:600;color:#0b0b0b;">{{ g.diferencia }}</div>
+          </td>
+        </tr></table>
+      </td></tr>
+      <tr><td style="padding:6px 16px 0 16px;font-family:{{ fuente }};font-size:12px;color:#52514e;">{{ g.comparables }}</td></tr>
+      <tr><td style="padding:10px 16px 0 16px;font-family:{{ fuente }};font-size:13px;line-height:1.55;color:#0b0b0b;">{{ g.explicacion }}</td></tr>
+      <tr><td style="padding:10px 16px 14px 16px;font-family:{{ fuente }};font-size:13px;"><a href="{{ g.url }}" style="color:#1c5cab;">Ver el anuncio en Carroya</a></td></tr>
+    </table>
+  </td></tr>
+  {%- else %}
+  <tr><td style="font-family:{{ fuente }};font-size:13px;line-height:1.55;color:#0b0b0b;">{{ c.sin_gangas }}</td></tr>
+  {%- endfor %}
+  {%- if c.notas_alertas %}
+  <tr><td style="padding-top:6px;font-family:{{ fuente }};font-size:12px;line-height:1.5;color:#52514e;">{{ c.notas_alertas }}</td></tr>
+  {%- endif %}
+
+  {%- if not c.primera_ejecucion %}
+  {{ titulo_seccion("Bajadas de precio en anuncios ya conocidos") }}
+  {%- if c.bajadas %}
+  <tr><td>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e1e0d9;">
+    {%- for b in c.bajadas %}
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;line-height:1.4;"><a href="{{ b.url }}" style="color:#1c5cab;text-decoration:none;">{{ b.descripcion }}</a><br><span style="color:#52514e;font-size:12px;">Antes {{ b.antes }} ({{ b.fecha_anterior }}), ahora {{ b.ahora }}</span></td>
+        <td style="padding:8px 0;border-bottom:1px solid #e1e0d9;font-family:{{ fuente }};font-size:13px;font-weight:600;color:#0b0b0b;text-align:right;white-space:nowrap;">{{ b.variacion }}</td>
+      </tr>
+    {%- endfor %}
+    </table>
+  </td></tr>
+  {%- else %}
+  <tr><td style="font-family:{{ fuente }};font-size:13px;color:#52514e;">Ningún anuncio ya conocido bajó de precio hoy.</td></tr>
+  {%- endif %}
+  {%- endif %}
+
+  {{ titulo_seccion("Cómo se detectan las gangas") }}
+  <tr><td style="font-family:{{ fuente }};font-size:13px;line-height:1.55;color:#52514e;">
+    <ul style="margin:0;padding-left:18px;">
+    {%- for linea in c.metodo %}<li style="margin-bottom:4px;">{{ linea }}</li>{% endfor %}
+    </ul>
+  </td></tr>
+
+  <tr><td style="padding:28px 0 24px 0;border-bottom:0;font-family:{{ fuente }};font-size:11px;line-height:1.6;color:#898781;">
+    {{ c.pie }}
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

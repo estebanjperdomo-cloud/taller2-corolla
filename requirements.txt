@@ -1,0 +1,12 @@
+# Librerías del monitor. Se instalan con: pip install -r requirements.txt
+playwright>=1.45        # navegador real para leer Carroya (luego: python -m playwright install chromium)
+pandas>=2.1             # tablas para el análisis y las exportaciones
+numpy>=1.26             # cálculos del modelo de precios
+matplotlib>=3.8         # gráfica de la distribución de precios
+jinja2>=3.1             # plantilla HTML del correo
+openpyxl>=3.1           # exportación de la base a Excel
+python-dotenv>=1.0      # lee el archivo .env con las credenciales del correo
+tzdata>=2024.1          # zona horaria America/Bogota también en Windows
+
+# Pruebas automáticas
+pytest>=8.0

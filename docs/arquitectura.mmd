@@ -1,0 +1,13 @@
+flowchart LR
+    C(["Carroya.com<br/>páginas públicas"]) --> P1
+    T8{{"8:00 · launchd<br/>en el Mac"}} --> P1["Paso 1<br/>búsqueda de enlaces<br/>y descarga<br/>(Playwright)"]
+    P1 -->|"enlaces_FECHA.csv<br/>datos_FECHA.csv"| P3["Paso 3<br/>procesar_dia()<br/>idempotente"]
+    P3 --> BD[("Paso 2<br/>corolla.sqlite<br/>anuncios<br/>observaciones<br/>cambios")]
+    BD --> P6["Paso 6<br/>precio esperado<br/>y posibles gangas"]
+    P6 -->|"gráfica y<br/>resumen"| P7["Paso 7<br/>plantilla<br/>y envío"]
+    T11{{"11:00 · launchd<br/>en el Mac"}} --> P7
+    P7 --> G(["Gmail de<br/>la pareja"])
+    P1 -.-> L["Paso 5<br/>logs JSONL de cada etapa<br/>(America/Bogota)"]
+    P3 -.-> L
+    P6 -.-> L
+    P7 -.-> L
