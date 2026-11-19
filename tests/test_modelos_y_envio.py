@@ -255,7 +255,8 @@ def test_si_el_correo_de_ayer_ya_salio_no_se_envia_nada_antes_de_las_11(tmp_path
     monkeypatch.setenv("COROLLA_DATOS", str(tmp_path))
     rutas = config.Rutas("oficial").crear()
     (rutas.logs / "COR-20261119-110002.jsonl").write_text(
-        json.dumps({"etapa": "correo", "correo_estado": "enviado"}) + "\n", encoding="utf-8")
+        json.dumps({"etapa": "correo", "correo_estado": "enviado", "fecha_reporte": "2026-11-19"}) + "\n",
+        encoding="utf-8")
     monkeypatch.setattr(flujo, "ejecutar_correo", lambda *a, **k: pytest.fail("no debía enviarse"))
     with config.reloj_simulado(datetime(2026, 11, 20, 7, 0, tzinfo=config.ZONA_HORARIA)):
         assert taller.main(["correo", "--programado"]) == 0
@@ -325,6 +326,17 @@ def test_basta_con_que_conecte_uno_de_los_dos_puertos(monkeypatch):
     monkeypatch.setattr(socket, "create_connection", conectar)
     assert esperar_conexion("smtp.gmail.com", (465, 587), max_espera_s=0, registrar=lambda m: None) is True
     assert probados == [465, 587]
+
+
+def test_el_correo_de_ayer_enviado_hoy_no_cuenta_como_el_de_hoy(tmp_path, monkeypatch):
+    # El correo del 19 salió a las 7:00 del 20 (el Mac durmió). Eso no debe tapar el del 20.
+    monkeypatch.setenv("COROLLA_DATOS", str(tmp_path))
+    rutas = config.Rutas("oficial").crear()
+    (rutas.logs / "COR-20261120-070002.jsonl").write_text(
+        json.dumps({"etapa": "correo", "correo_estado": "enviado", "fecha_reporte": "2026-11-19"}) + "\n",
+        encoding="utf-8")
+    assert correo.correo_ya_enviado(rutas, date(2026, 11, 19)) is True
+    assert correo.correo_ya_enviado(rutas, date(2026, 11, 20)) is False
 
 
 def test_el_correo_manual_si_se_puede_repetir(tmp_path, monkeypatch):

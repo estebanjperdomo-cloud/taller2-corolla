@@ -153,14 +153,19 @@ def candado_correo(rutas: config.Rutas, fecha: date):
 
 
 def correo_ya_enviado(rutas: config.Rutas, fecha: date) -> bool:
-    """¿Algún correo de ese día ya quedó enviado? Lo usan el envío de las 11:00 y los reintentos."""
-    for archivo in rutas.logs.glob(f"*COR-{fecha:%Y%m%d}-*.jsonl"):
+    """¿Algún correo de ese día ya quedó enviado? Lo usan el envío de las 11:00 y los reintentos.
+
+    Se mira la fecha del reporte y no la del nombre del archivo, porque el correo de un día
+    puede salir al día siguiente (por ejemplo, si el Mac durmió toda la tarde).
+    """
+    for archivo in rutas.logs.glob("*COR-*.jsonl"):
         for linea in archivo.read_text(encoding="utf-8").splitlines():
             try:
                 registro = json.loads(linea)
             except ValueError:
                 continue
-            if registro.get("etapa") == "correo" and registro.get("correo_estado") == "enviado":
+            if (registro.get("etapa") == "correo" and registro.get("correo_estado") == "enviado"
+                    and registro.get("fecha_reporte") == fecha.isoformat()):
                 return True
     return False
 
