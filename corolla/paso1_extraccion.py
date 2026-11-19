@@ -138,8 +138,34 @@ def resumen_tarjeta(item: dict, plantilla_detalle: str = config.URL_DETALLE) -> 
     }
 
 
-def verificar_criterios(marca: Any, linea: Any, anio: Any) -> tuple[bool, str | None]:
-    """¿El anuncio es un Toyota Corolla modelo 2022 a 2026?"""
+def linea_coincide(linea: Any, busqueda) -> bool:
+    """Para los modelos adicionales. "Mazda 3", "3" o "MAZDA3 Sport" son Mazda 3; "CX-30" no.
+
+    Se le quita la marca al comienzo y se compara la primera palabra con la línea pedida.
+    """
+    texto = normalizar(linea)
+    marca = normalizar(busqueda.marca)
+    if texto.startswith(marca):
+        texto = texto[len(marca):].strip(" -")
+    palabras = texto.replace("-", " ").split()
+    if not palabras or palabras[0] != normalizar(busqueda.linea):
+        return False
+    return not any(normalizar(p) in palabras for p in busqueda.excluir)
+
+
+def verificar_criterios(marca: Any, linea: Any, anio: Any, busqueda=None) -> tuple[bool, str | None]:
+    """¿El anuncio cumple los criterios? Sin búsqueda, los del taller: Toyota Corolla 2022 a 2026."""
+    if busqueda is not None:
+        if normalizar(marca) != normalizar(busqueda.marca):
+            return False, f"marca distinta ({marca})"
+        if not linea_coincide(linea, busqueda):
+            return False, f"línea distinta ({linea})"
+        anio = numero_o_nada(anio)
+        if anio is None:
+            return False, "sin año del modelo"
+        if not busqueda.anio_min <= anio <= busqueda.anio_max:
+            return False, f"año fuera de rango ({anio})"
+        return True, None
     if normalizar(marca) != normalizar(config.MARCA):
         return False, f"marca distinta ({marca})"
     if normalizar(linea) != normalizar(config.LINEA):
@@ -180,12 +206,28 @@ def detectar_sunroof(accesorios: list[str], *otros_textos: tuple[str, Any]) -> t
 NIVELES = ("GR-S", "SEG", "XEI", "XLI")
 
 
+# Niveles de los modelos adicionales, en el orden en que se revisan ("grand touring" antes
+# que "touring"). Se revisan después de los del Corolla, así el Corolla no cambia.
+NIVELES_ADICIONALES = (
+    (r"\bgrand\s+touring\b", "Grand Touring"),   # Mazda 3
+    (r"\bcarbon\b", "Carbon Edition"),
+    (r"\bsignature\b", "Signature"),
+    (r"\btouring\b", "Touring"),
+    (r"\bprime\b", "Prime"),
+    (r"\bgt[\s-]?line\b", "GT Line"),            # Kia K3
+    (r"\bzenith\b", "Zenith"),
+    (r"\bvibrant\b", "Vibrant"),
+    (r"\bdesire\b", "Desire"),
+)
+
+
 def nivel_version(version: Any) -> str:
     """Agrupa las versiones escritas a mano en niveles de equipamiento.
 
     '1.8 CVT SEG' y 'SE-G Automatico' -> SEG; '1.8 XE-i Automatico' -> XEI;
-    '1.8 XL-i' -> XLI; 'GR-S 2.0' -> GR-S. Lo que no se reconoce queda
-    'sin identificar' (no se adivina).
+    '1.8 XL-i' -> XLI; 'GR-S 2.0' -> GR-S. En los modelos adicionales,
+    'Touring 2.0 Sedan Automático Hybrid' -> Touring y 'GT Line 1.6 Automatico' -> GT Line.
+    Lo que no se reconoce queda 'sin identificar' (no se adivina).
     """
     texto = normalizar(version)
     if not texto:
@@ -198,10 +240,13 @@ def nivel_version(version: Any) -> str:
         return "XEI"
     if re.search(r"\bxl[\s-]?i", texto):
         return "XLI"
+    for patron, nivel in NIVELES_ADICIONALES:
+        if re.search(patron, texto):
+            return nivel
     return "sin identificar"
 
 
-def campos_detalle(respuesta: dict, id_esperado: str, tarjeta: dict | None = None) -> dict:
+def campos_detalle(respuesta: dict, id_esperado: str, tarjeta: dict | None = None, criterios=None) -> dict:
     """Extrae los campos del vehículo de la respuesta de 'find-vehicle-detail'.
 
     Lanza ValueError si la respuesta no trae datos o es de otro anuncio.
@@ -243,7 +288,7 @@ def campos_detalle(respuesta: dict, id_esperado: str, tarjeta: dict | None = Non
         "n_accesorios": len(accesorios),
         "accesorios": "; ".join(accesorios) or None,
     }
-    cumple, motivo = verificar_criterios(fila["marca"], fila["linea"], fila["anio"])
+    cumple, motivo = verificar_criterios(fila["marca"], fila["linea"], fila["anio"], criterios)
     fila["cumple_criterios"] = cumple
     fila["motivo_no_cumple"] = motivo
     return fila

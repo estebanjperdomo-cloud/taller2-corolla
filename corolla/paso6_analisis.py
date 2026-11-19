@@ -6,8 +6,9 @@ El método, en palabras simples (más detalle en el README):
    válido (en pesos y dentro de un rango plausible).
 2. Un modelo de precios hedónico calcula el "precio esperado" de cada carro a
    partir de tres cosas: año del modelo, kilometraje y grupo de versión. El grupo
-   junta el nivel de equipamiento (XLI, XEI, SEG, GR-S) con el motor (híbrido o
-   gasolina), porque en el Corolla una cosa determina la otra. Es una regresión
+   junta el nivel de equipamiento (XLI, XEI, SEG, GR-S; en los modelos adicionales
+   Prime, Touring, Grand Touring, GT Line...) con el motor (híbrido o gasolina),
+   porque en el Corolla una cosa determina la otra. Es una regresión
    del logaritmo del precio, así que cada efecto se lee en porcentaje. Se ajusta
    dos veces; la segunda sin los precios extremos, para que un error de
    digitación o una ganga no muevan la referencia de los demás.

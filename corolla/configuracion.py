@@ -54,6 +54,40 @@ PAUSA_ENTRE_PAGINAS_S = (1.5, 3.5)     # pausa amable entre una página y otra
 TIEMPO_LIMITE_MS = 45_000
 GUARDAR_CADA = 10                      # guardar el progreso cada N descargas
 ESPERA_INTERNET_MAX_S = 600            # al despertar, el Mac puede tardar en conectarse al wifi
+ESPERA_RECOLECCION_MAX_S = 3600        # el correo programado espera hasta una hora a la recolección
+ESPERA_RECOLECCION_GRACIA_S = 120      # y dos minutos si la recolección todavía no ha arrancado
+
+# --- Búsquedas en Carroya --------------------------------------------------------------------
+@dataclass(frozen=True)
+class Busqueda:
+    """Una búsqueda en Carroya. El Corolla es la del taller; las demás son adicionales.
+
+    linea es la primera palabra de la línea del carro una vez se le quita la marca
+    (por ejemplo "3" para Mazda 3 o "k3" para Kia K3). excluir lista palabras que
+    indican otro carro aunque empiece igual (por ejemplo "cross" en Kia K3 Cross).
+    """
+
+    clave: str
+    nombre: str
+    marca: str
+    linea: str
+    url: str
+    excluir: tuple = ()
+    anio_min: int = ANIO_MIN
+    anio_max: int = ANIO_MAX
+    max_paginas: int = MAX_PAGINAS
+
+
+# Cada modelo adicional usa su página pública en Carroya, igual que la del Corolla. Se
+# revisaron en el navegador el 18 de noviembre de 2026. Mazda 3 tenía 100 anuncios en 5
+# páginas y Kia K3 tenía 38 en 2. Igual cada anuncio se revisa contra la marca, la línea
+# y los años, por si la página mezcla otro carro.
+URL_MODELO = "https://www.carroya.com/automoviles-y-camionetas/{marca}/{linea}?page={{pagina}}&modelRange=2022-2026"
+MODELOS_EXTRA = (
+    Busqueda("mazda-3", "Mazda 3", "Mazda", "3", URL_MODELO.format(marca="mazda", linea="3")),
+    Busqueda("kia-k3", "Kia K3", "Kia", "k3", URL_MODELO.format(marca="kia", linea="k3"), excluir=("cross",)),
+)
+
 
 # oficial  evidencias del 16 al 21 de noviembre
 # prueba   cualquier ejecución manual y las pruebas antes o después del periodo
@@ -122,6 +156,20 @@ def modo_programado(fecha: date) -> str | None:
     return None
 
 
+def fecha_correo_programado(momento: datetime) -> date:
+    """De qué día es el correo que le toca a una tarea programada que arranca en 'momento'.
+
+    Si el Mac estaba dormido a la hora de una tarea, launchd la corre apenas se despierta.
+    Una tarea del correo que arranca antes de las 11:00 viene del horario de ayer (por
+    ejemplo, el Mac durmió desde la tarde hasta la mañana siguiente). Le toca el correo
+    de ayer, que quizá no salió, y no el de hoy, cuya recolección todavía no ha corrido.
+    """
+    momento = momento.astimezone(ZONA_HORARIA)
+    if momento.time() >= HORA_CORREO:
+        return momento.date()
+    return momento.date() - timedelta(days=1)
+
+
 def nuevo_run_id(tipo: str, modo: str, momento: datetime | None = None) -> str:
     """Identificador de ejecución, legible y ordenable.
 
@@ -136,6 +184,11 @@ def nuevo_run_id(tipo: str, modo: str, momento: datetime | None = None) -> str:
 # --- Carpetas y archivos ------------------------------------------------------------
 def carpeta_datos() -> Path:
     return Path(os.environ.get("COROLLA_DATOS", RAIZ_PROYECTO / "datos"))
+
+
+def rutas_modelo(busqueda: "Busqueda", modo: str) -> "Rutas":
+    """Carpetas de un modelo adicional, separadas del Corolla: datos/modelos/<clave>/<modo>/..."""
+    return Rutas(modo, carpeta_datos() / "modelos" / busqueda.clave)
 
 
 @dataclass(frozen=True)

@@ -18,6 +18,7 @@ import os
 import smtplib
 import ssl
 import time
+from contextlib import contextmanager
 from datetime import date, datetime
 from email.message import EmailMessage
 from email.utils import format_datetime, make_msgid
@@ -71,6 +72,99 @@ def _numero(valor) -> str:
 
 
 # --- Reunir la información del día ---------------------------------------------------------------
+def tarjeta_ganga(a: dict, modelo: str) -> dict:
+    """Lo que muestra el correo de una posible ganga (Corolla o modelo adicional)."""
+    sospechoso = a["clasificacion"] == analisis.SOSPECHOSO
+    sunroof = {True: "Sunroof sí", False: "Sunroof no"}.get(a.get("sunroof"), "Sunroof sin dato")
+    if a.get("sunroof") in (1, 1.0):
+        sunroof = "Sunroof sí"
+    elif a.get("sunroof") in (0, 0.0):
+        sunroof = "Sunroof no"
+    rasgos = [str(a["anio"]) if a.get("anio") else "año sin dato",
+              a.get("version") or "versión sin dato", formato.kilometros(a.get("kilometraje")),
+              a.get("transmision") or "caja sin dato", a.get("combustible") or "combustible sin dato",
+              (a.get("ciudad") or "ciudad sin dato").title(), sunroof]
+    return {
+        "sospechoso": sospechoso,
+        "etiqueta": "Precio sospechosamente bajo, verificar" if sospechoso else "Posible ganga",
+        "titulo": f"{modelo} {a.get('anio') or ''} {a.get('version') or ''}".strip(),
+        "url": a["url"],
+        "caracteristicas": rasgos,
+        "precio": formato.pesos(a["precio"]),
+        "esperado": formato.pesos(round(a["precio_esperado"], -5)),
+        "diferencia": f"{formato.porcentaje(a['descuento'])} menos",
+        "comparables": (f"Se comparó con el precio esperado según año, kilometraje y versión, y con la mediana "
+                        f"de {int(a['n_comparables'])} anuncios parecidos, que es "
+                        f"{formato.pesos(a['mediana_comparables'])}."),
+        "explicacion": a["explicacion"],
+    }
+
+
+def otros_modelos(modo: str, fecha: date) -> list[dict]:
+    """Resumen de los modelos adicionales para el correo. Nunca hace fallar el correo del Corolla."""
+    salida = []
+    for busqueda in config.MODELOS_EXTRA:
+        try:
+            rutas = config.rutas_modelo(busqueda, modo)
+            est = estado_mod.leer(rutas, fecha)
+            resumen = _leer_json(rutas.reporte(fecha) / f"resumen_{fecha.isoformat()}.json")
+            if est is None and resumen is None:
+                continue
+            metricas = (est or {}).get("metricas") or {}
+            partes = [f"{formato.miles(metricas.get('enlaces_encontrados') or 0)} anuncios",
+                      f"{formato.miles(metricas.get('anuncios_nuevos') or 0)} nuevos para el sistema"]
+            st = (resumen or {}).get("estadisticas")
+            if st:
+                partes.append(f"mediana {formato.pesos(st['mediana'])} (entre {formato.pesos(st['q1'])} y "
+                              f"{formato.pesos(st['q3'])} está la mitad central)")
+            codigo = (est or {}).get("estado", "sin_ejecucion")
+            estado_txt = {"completada": "completa", "completada_con_advertencias": "con advertencias",
+                          "en_curso": "en curso", "fallida": "fallida"}.get(codigo, codigo)
+            gangas = [tarjeta_ganga(a, busqueda.nombre) for a in (resumen or {}).get("alertas_nuevas") or []][:3]
+            bajadas = len((resumen or {}).get("bajadas_precio") or [])
+            if bajadas:
+                partes.append(f"{bajadas} bajada{'s' if bajadas > 1 else ''} de precio")
+            salida.append({"nombre": busqueda.nombre, "estado": estado_txt,
+                           "resumen": ", ".join(partes) + ".", "gangas": gangas,
+                           "sin_gangas": "Sin posibles gangas nuevas hoy." if not gangas else ""})
+        except Exception as exc:
+            salida.append({"nombre": busqueda.nombre, "estado": "sin datos",
+                           "resumen": f"No se pudo leer el resumen ({type(exc).__name__}).", "gangas": [],
+                           "sin_gangas": ""})
+    return salida
+
+
+@contextmanager
+def candado_correo(rutas: config.Rutas, fecha: date):
+    """Evita que dos envíos del mismo día corran a la vez (por ejemplo, el de las 11:00 y un
+    reintento que arrancan juntos cuando el Mac se despierta). En Windows no hace falta."""
+    rutas.crear()
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    with open(rutas.estado / f"correo_{fecha.isoformat()}.lock", "w") as archivo:
+        fcntl.flock(archivo, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(archivo, fcntl.LOCK_UN)
+
+
+def correo_ya_enviado(rutas: config.Rutas, fecha: date) -> bool:
+    """¿Algún correo de ese día ya quedó enviado? Lo usan el envío de las 11:00 y los reintentos."""
+    for archivo in rutas.logs.glob(f"*COR-{fecha:%Y%m%d}-*.jsonl"):
+        for linea in archivo.read_text(encoding="utf-8").splitlines():
+            try:
+                registro = json.loads(linea)
+            except ValueError:
+                continue
+            if registro.get("etapa") == "correo" and registro.get("correo_estado") == "enviado":
+                return True
+    return False
+
+
 def reunir(rutas: config.Rutas, fecha: date, run_id_correo: str) -> dict:
     est = estado_mod.leer(rutas, fecha)
     manifiesto = _leer_json(rutas.manifiesto(fecha))
@@ -179,32 +273,7 @@ def reunir(rutas: config.Rutas, fecha: date, run_id_correo: str) -> dict:
                                     for a in resumen.get("por_anio") or []]
 
     # Gangas nuevas
-    gangas = []
-    for a in (resumen or {}).get("alertas_nuevas") or []:
-        sospechoso = a["clasificacion"] == analisis.SOSPECHOSO
-        sunroof = {True: "Sunroof sí", False: "Sunroof no"}.get(a.get("sunroof"), "Sunroof sin dato")
-        if a.get("sunroof") in (1, 1.0):
-            sunroof = "Sunroof sí"
-        elif a.get("sunroof") in (0, 0.0):
-            sunroof = "Sunroof no"
-        rasgos = [str(a["anio"]) if a.get("anio") else "año sin dato",
-                  a.get("version") or "versión sin dato", formato.kilometros(a.get("kilometraje")),
-                  a.get("transmision") or "caja sin dato", a.get("combustible") or "combustible sin dato",
-                  (a.get("ciudad") or "ciudad sin dato").title(), sunroof]
-        gangas.append({
-            "sospechoso": sospechoso,
-            "etiqueta": "Precio sospechosamente bajo, verificar" if sospechoso else "Posible ganga",
-            "titulo": f"Toyota Corolla {a.get('anio') or ''} {a.get('version') or ''}".strip(),
-            "url": a["url"],
-            "caracteristicas": rasgos,
-            "precio": formato.pesos(a["precio"]),
-            "esperado": formato.pesos(round(a["precio_esperado"], -5)),
-            "diferencia": f"{formato.porcentaje(a['descuento'])} menos",
-            "comparables": (f"Se comparó con el precio esperado según año, kilometraje y versión, y con la mediana "
-                            f"de {int(a['n_comparables'])} anuncios parecidos, que es "
-                            f"{formato.pesos(a['mediana_comparables'])}."),
-            "explicacion": a["explicacion"],
-        })
+    gangas = [tarjeta_ganga(a, "Toyota Corolla") for a in (resumen or {}).get("alertas_nuevas") or []]
     if resumen is None:
         sin_gangas = "No se puede evaluar hoy porque el análisis del día no está disponible."
     elif resumen.get("modelo") is None:
@@ -266,6 +335,7 @@ def reunir(rutas: config.Rutas, fecha: date, run_id_correo: str) -> dict:
            f"Correo {run_id_correo} · Modo {modo}. Datos de anuncios públicos de Carroya.com.")
 
     return {
+        "otros_modelos": otros_modelos(modo, fecha) if modo in ("oficial", "prueba") else [],
         "asunto": asunto,
         "preheader": f"{kpis[0]['valor']} enlaces, {kpis[1]['valor']} nuevos, {corto}.",
         "fecha": fecha.isoformat(),
@@ -316,6 +386,15 @@ def texto_plano(c: dict) -> str:
         lineas += [f"  {c['sin_gangas']}"]
     if c["notas_alertas"]:
         lineas += [f"  {c['notas_alertas']}"]
+    if c.get("otros_modelos"):
+        lineas += ["", "OTROS MODELOS MONITOREADOS (ADICIONAL)"]
+        for m in c["otros_modelos"]:
+            lineas += [f"  {m['nombre']} · recolección {m['estado']} · {m['resumen']}"]
+            for g in m["gangas"]:
+                lineas += [f"    * {g['etiqueta']} · {g['titulo']} · {g['precio']} · {g['diferencia']}",
+                           f"      {g['url']}", f"      {g['explicacion']}"]
+            if m["sin_gangas"]:
+                lineas += [f"    {m['sin_gangas']}"]
     if c["bajadas"]:
         lineas += ["", "BAJADAS DE PRECIO"] + [f"  * {b['descripcion']} · {b['antes']} a {b['ahora']} ({b['variacion']}) "
                                                 f"{b['url']}" for b in c["bajadas"]]
@@ -384,29 +463,47 @@ def enviar(mensaje: EmailMessage, intentos: int = 3, espera_s: float = 20) -> tu
     local = host in ("localhost", "127.0.0.1")
     if not (usuario and clave) and not local:
         return "no_enviado", "faltan SMTP_USER o SMTP_PASSWORD"
+    # Algunas redes (oficinas, universidades) bloquean el puerto 465. Si la conexión falla,
+    # se prueba el otro puerto de Gmail (587, con STARTTLS) antes de dar el intento por perdido.
+    puertos = [puerto] + [p for p in (465, 587) if p != puerto and not local]
     ultimo = None
     for intento in range(1, intentos + 1):
-        try:
-            contexto = ssl.create_default_context()
-            if puerto == 465:
-                servidor = smtplib.SMTP_SSL(host, puerto, context=contexto, timeout=60)
-            else:
-                servidor = smtplib.SMTP(host, puerto, timeout=60)
-            with servidor:
-                if puerto != 465:
-                    servidor.ehlo()
-                    if servidor.has_extn("starttls"):
-                        servidor.starttls(context=contexto)
-                        servidor.ehlo()
-                if usuario and clave:
-                    servidor.login(usuario, clave)
-                servidor.send_message(mensaje, to_addrs=destinatarios)
-            return "enviado", f"a {', '.join(destinatarios)} en el intento {intento}"
-        except Exception as exc:
-            ultimo = f"{type(exc).__name__}: {exc}"
-            if intento < intentos:
-                time.sleep(espera_s)
+        for p in puertos:
+            try:
+                _enviar_por(host, p, usuario, clave, mensaje, destinatarios)
+                extra = f" (puerto {p})" if p != puerto else ""
+                return "enviado", f"a {', '.join(destinatarios)} en el intento {intento}{extra}"
+            except smtplib.SMTPConnectError as exc:          # el servidor no aceptó la conexión
+                ultimo = f"{type(exc).__name__}: {exc} (puerto {p})"
+            except smtplib.SMTPResponseException as exc:     # respondió con un error, por ejemplo la contraseña
+                ultimo = f"{type(exc).__name__}: {exc}"
+                break
+            except OSError as exc:                           # la red no dejó conectar: probar el otro puerto
+                ultimo = f"{type(exc).__name__}: {exc} (puerto {p})"
+            except Exception as exc:
+                ultimo = f"{type(exc).__name__}: {exc}"
+                break
+        if intento < intentos:
+            time.sleep(espera_s)
     return "fallido", ultimo
+
+
+def _enviar_por(host: str, puerto: int, usuario: str, clave: str, mensaje: EmailMessage,
+                destinatarios: list[str]) -> None:
+    contexto = ssl.create_default_context()
+    if puerto == 465:
+        servidor = smtplib.SMTP_SSL(host, puerto, context=contexto, timeout=60)
+    else:
+        servidor = smtplib.SMTP(host, puerto, timeout=60)
+    with servidor:
+        if puerto != 465:
+            servidor.ehlo()
+            if servidor.has_extn("starttls"):
+                servidor.starttls(context=contexto)
+                servidor.ehlo()
+        if usuario and clave:
+            servidor.login(usuario, clave)
+        servidor.send_message(mensaje, to_addrs=destinatarios)
 
 
 def guardar_copia(rutas: config.Rutas, fecha: date, run_id: str, mensaje: EmailMessage,

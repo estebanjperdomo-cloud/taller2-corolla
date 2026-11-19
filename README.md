@@ -1,6 +1,6 @@
 # Monitor de Toyota Corolla en Carroya
 
-Taller 2 del Taller de Programación Aplicada en Python. El programa consulta todos los días los anuncios de Toyota Corolla modelo 2022 a 2026 publicados en Carroya, guarda lo que encuentra, lo consolida en una base de datos con historial, busca posibles gangas y envía un correo con el resumen. Corre del 16 al 21 de noviembre de 2026 en un Mac, con la recolección a las 8:00 a. m. y el correo a las 11:00 a. m., hora de Colombia.
+Taller 2 del Taller de Programación Aplicada en Python. El programa consulta todos los días los anuncios de Toyota Corolla modelo 2022 a 2026 publicados en Carroya, guarda lo que encuentra, lo consolida en una base de datos con historial, busca posibles gangas y envía un correo con el resumen. Corre del 16 al 21 de noviembre de 2026 en un Mac, con la recolección a las 8:00 a. m. y el correo a las 11:00 a. m., hora de Colombia. Desde el 19 de noviembre sigue además, con el mismo método y por separado, el Mazda 3 y el Kia K3 (ver [Modelos adicionales](#modelos-adicionales-mazda-3-y-kia-k3)).
 
 **Para instalarlo y usarlo, siga [GUIA_PASO_A_PASO.md](GUIA_PASO_A_PASO.md).** Este README explica cómo funciona y por qué se tomó cada decisión.
 
@@ -19,12 +19,12 @@ El enunciado pide usar un coding agent para desarrollar la solución y poder exp
 | | `corolla/paso1_recoleccion.py` | Recorre todas las páginas, descarga cada ficha y escribe los archivos diarios |
 | 2. Base consolidada (15 %) | `corolla/paso2_base_de_datos.py` y `consultas.sql` | Tablas SQLite, identificador estable y consultas |
 | 3. Actualización (10 %) | `corolla/paso3_actualizacion.py` | `procesar_dia()`, idempotente |
-| 4. Automatización (10 %) | `corolla/paso4_programacion.py` | Las dos tareas de launchd (8:00 y 11:00) |
+| 4. Automatización (10 %) | `corolla/paso4_programacion.py` | Las tres tareas de launchd (8:00, 11:00 y reintentos del correo) |
 | 5. Logs (10 %) | `corolla/paso5_bitacora.py` y `corolla/estado.py` | Logs por etapa y estado del día |
 | 6. Precios y gangas (20 %) | `corolla/paso6_analisis.py` y `corolla/paso6_grafica.py` | Distribución, modelo de precios y alertas explicadas |
 | 7. Correo (5 %) | `corolla/paso7_correo.py` y `corolla/plantillas/correo.html` | Plantilla y envío |
 | 8. Entrega (10 %) | `corolla/paso8_entrega.py` | Exportaciones y zip para Bloque Neón |
-| Todo junto | `corolla/flujo.py` y `taller.py` | Orquestación y comandos |
+| Todo junto | `corolla/flujo.py`, `taller.py` y `corolla/avisos.py` | Orquestación, comandos y avisos en la pantalla del Mac |
 | Pruebas | `corolla/simulacion.py` y `tests/` | Carroya simulado, pruebas y demostración sin internet |
 
 ## Comandos
@@ -41,10 +41,12 @@ Todo se hace con `python taller.py <comando>`. Los comandos manuales trabajan en
 | `consultar` | Muestra las consultas del paso 2 |
 | `paso6` | Distribución de precios, gráfica y posibles gangas |
 | `paso7` | Arma y envía el correo (`--sin-enviar` solo guarda la copia) |
-| `log` | Resumen de los logs de un día |
-| `recolectar` | Lo de las 8:00, pasos 1, 3 y 6 seguidos |
-| `correo` | Lo de las 11:00, paso 7 |
-| `programar`, `estado-programacion`, `probar-programacion`, `desprogramar` | Tareas diarias del Mac |
+| `log` | Resumen de los logs de un día, también de los modelos adicionales |
+| `recolectar` | Lo de las 8:00, pasos 1, 3 y 6 del Corolla y después de los modelos adicionales (`--solo-corolla` los omite) |
+| `correo` | Lo de las 11:00, paso 7. Con `--programado` no repite un correo que ya salió |
+| `modelos` | Pasos 1, 3 y 6 solo de los modelos adicionales |
+| `probar-modelos` | Lee las primeras páginas de cada modelo adicional y muestra qué anuncios reconoce |
+| `programar`, `estado-programacion`, `probar-programacion`, `desprogramar` | Tareas del Mac (recolección, correo y reintentos del correo) |
 | `reconstruir` | Rehace la base desde los archivos diarios |
 | `exportar` | Base en CSV y Excel y log consolidado |
 | `entregar` | Arma `entrega_taller2_corolla.zip` y dice qué falta |
@@ -137,16 +139,25 @@ La disponibilidad tiene tres valores.
 
 ## Paso 4. Automatización en el Mac
 
-`python taller.py programar` crea dos tareas de launchd, el programador de tareas de macOS, en `~/Library/LaunchAgents`.
+`python taller.py programar` crea tres tareas de launchd, el programador de tareas de macOS, en `~/Library/LaunchAgents`.
 
-* `co.uniandes.taller2corolla.recoleccion` corre todos los días a las 8:00 `taller.py recolectar --programado` (pasos 1, 3 y 6).
+* `co.uniandes.taller2corolla.recoleccion` corre todos los días a las 8:00 `taller.py recolectar --programado` (pasos 1, 3 y 6 del Corolla y luego de los modelos adicionales).
 * `co.uniandes.taller2corolla.correo` corre todos los días a las 11:00 `taller.py correo --programado` (paso 7), de forma independiente.
+* `co.uniandes.taller2corolla.reintento` corre el mismo comando del correo cada 30 minutos, de 11:30 a 23:30. Solo envía si el correo del día todavía no ha salido. Se agregó el 18 de noviembre, después de que ese día la red del trabajo bloqueó el envío de las 11:00 (ver `docs/incidentes.md`).
 
-Las dos usan rutas absolutas al Python del entorno virtual y se lanzan con `caffeinate`, que impide que el Mac se duerma mientras trabajan. Con `--programado` la fecha decide el modo. Antes del 16 de noviembre la ejecución es de prueba, del 16 al 21 es oficial y después del 21 no hace nada. Así la misma programación sirve para la prueba completa del domingo 15 y no hay que tocarla el lunes. Lo que imprime cada tarea queda en `datos/launchd/`, cada ejecución queda marcada como programada en el log y el correo dice cómo se inició la recolección. Esa es la evidencia de las ejecuciones programadas.
+Las tres usan rutas absolutas al Python del entorno virtual y se lanzan con `caffeinate`, que impide que el Mac se duerma mientras trabajan. Con `--programado` la fecha decide el modo. Antes del 16 de noviembre la ejecución es de prueba, del 16 al 21 es oficial y después del 21 no hace nada. Así la misma programación sirve para la prueba completa del domingo 15 y no hay que tocarla el lunes. Lo que imprime cada tarea queda en `datos/launchd/`, cada ejecución queda marcada como programada en el log y el correo dice cómo se inició la recolección. Esa es la evidencia de las ejecuciones programadas.
+
+Si a la hora de una tarea el Mac estaba dormido, launchd la corre apenas se despierta. Por eso al despertar pueden arrancar juntas la recolección y el correo, y el correo programado sigue tres reglas.
+
+* Si la recolección del día está corriendo, la espera hasta una hora. La recolección deja tomado un candado del sistema (`estado/recoleccion_<fecha>.lock`) mientras trabaja, y el sistema lo suelta solo si el proceso se cae.
+* Nunca envía dos veces el correo de un mismo día. Antes de enviar revisa en los logs si ya salió, con un candado para que dos tareas no envíen a la vez.
+* Si arranca antes de las 11:00, es una tarea que el Mac se perdió el día anterior. Entonces envía el correo de ayer, solo si no había salido, y no el de hoy, cuya recolección todavía no ha corrido.
+
+Además el Mac muestra avisos en la pantalla cuando empieza y termina la recolección, para no cerrar la tapa a mitad de camino, y cuando un correo no se pudo enviar.
 
 Condiciones para que funcione.
 
-* El Mac encendido, conectado a la corriente y con la sesión del usuario iniciada. Puede tener la pantalla bloqueada, pero no apagado ni con la sesión cerrada.
+* El Mac encendido, conectado a la corriente y con la sesión del usuario iniciada. Puede tener la pantalla bloqueada, pero no apagado ni con la sesión cerrada. Con la tapa cerrada se duerme aunque esté conectado, y lo que esté corriendo se detiene hasta que se abra.
 * Que no entre en reposo a esas horas (`sudo pmset -c sleep 0`) y, por si acaso, un despertar programado a las 7:55 (`sudo pmset repeat wakeorpoweron MTWRFSU 07:55:00`). Si a las 8:00 estaba dormido, launchd corre la tarea apenas se despierte.
 * Internet. Al empezar, el programa espera hasta diez minutos a que haya conexión con Carroya.
 * La carpeta del proyecto fuera de Documentos, Escritorio y Descargas, porque macOS no deja que las tareas programadas lean esas carpetas.
@@ -207,9 +218,29 @@ Si la rebaja supera 45 %, la alerta sale como precio sospechosamente bajo, porqu
 
 ## Paso 7. Correo diario
 
-El correo trae la fecha y el estado general del proceso, cómo se inició la recolección, los enlaces encontrados, los anuncios nuevos y las descargas exitosas, fallidas y pendientes, los errores relevantes y las etapas pendientes, la gráfica y el resumen de la distribución, las posibles gangas nuevas con enlace, características, precio publicado, referencia y explicación y, desde el segundo día, las bajadas de precio de anuncios ya conocidos. Se envía aunque no haya anuncios nuevos, no haya gangas o falle parte del proceso. Si a las 11:00 la recolección sigue en curso, lo dice. Si el armado completo falla, sale una versión mínima con el error. Cada correo se guarda además en `datos/<modo>/correos/` en .eml, .html y .txt, con la hora en el nombre.
+El correo trae la fecha y el estado general del proceso, cómo se inició la recolección, los enlaces encontrados, los anuncios nuevos y las descargas exitosas, fallidas y pendientes, los errores relevantes y las etapas pendientes, la gráfica y el resumen de la distribución, las posibles gangas nuevas con enlace, características, precio publicado, referencia y explicación y, desde el segundo día, las bajadas de precio de anuncios ya conocidos. Al final trae una sección aparte con los modelos adicionales (resumen del día y hasta tres posibles gangas por modelo). Se envía aunque no haya anuncios nuevos, no haya gangas o falle parte del proceso. Si a las 11:00 la recolección sigue corriendo, el correo programado la espera hasta una hora y, si no termina, sale igual y lo dice. Si el armado completo falla, sale una versión mínima con el error. Cada correo se guarda además en `datos/<modo>/correos/` en .eml, .html y .txt, con la hora en el nombre.
 
-Se envía por Gmail con una contraseña de aplicación (la guía explica cómo crearla) y los destinatarios están en `EMAIL_TO`.
+Se envía por Gmail con una contraseña de aplicación (la guía explica cómo crearla) y los destinatarios están en `EMAIL_TO`. Primero se intenta por el puerto 465 y, si la red no deja conectar (algunas oficinas y universidades lo bloquean), por el 587 con STARTTLS. Un error de contraseña no se reintenta por otro puerto, porque no es un problema de red. Si aun así no sale, la tarea de reintento lo vuelve a intentar cada 30 minutos hasta las 23:30.
+
+## Modelos adicionales (Mazda 3 y Kia K3)
+
+El enunciado pide el Toyota Corolla y eso no cambia. Las evidencias oficiales, el análisis principal y el asunto del correo son del Corolla. Como en clase el profesor sugirió comparar más modelos y marcas, desde el 19 de noviembre el mismo sistema sigue también dos sedanes de la misma categoría y del mismo rango de años.
+
+| Modelo | Página pública de Carroya | Anuncios el 18 de noviembre |
+|---|---|---|
+| Mazda 3 | `/automoviles-y-camionetas/mazda/3?modelRange=2022-2026` | 100, en 5 páginas |
+| Kia K3 | `/automoviles-y-camionetas/kia/k3?modelRange=2022-2026` | 38, en 2 páginas |
+
+Cómo se hizo.
+
+* Se reutilizan los mismos pasos 1, 3 y 6. Cada modelo es una `Busqueda` en `MODELOS_EXTRA` de `corolla/configuracion.py`, con su dirección y sus criterios.
+* Cada anuncio se revisa contra la marca, la línea y los años. La línea se compara por su primera palabra después de quitar la marca, así "3", "Mazda 3" y "MAZDA3" son Mazda 3 y "CX-30" no. El Kia K3 Cross se descarta porque es otro carro.
+* Cada modelo tiene su propia carpeta, `datos/modelos/<modelo>/<modo>/`, con sus archivos diarios, su base SQLite, sus logs y sus reportes. Así nunca se mezclan con las evidencias del Corolla.
+* Cada carro se compara solo con anuncios de su mismo modelo. El modelo de precios y la regla de alerta son los mismos. Los grupos de versión reconocen los niveles de cada marca (Prime, Touring, Grand Touring, Carbon Edition y Signature en Mazda, y GT Line, Zenith, Vibrant y Desire en Kia).
+* Corren después del Corolla, en la misma tarea de las 8:00. Si un modelo falla no afecta al Corolla ni al otro modelo, y el error queda en su log.
+* `python taller.py probar-modelos` muestra qué líneas trae cada página y cuáles se aceptan, y `python taller.py modelos --max-anuncios 3` hace una prueba rápida.
+
+Con 38 anuncios el Kia K3 tiene pocos carros por versión y por año, así que sus alertas se estiman con más incertidumbre que las del Corolla y deben leerse con más cuidado.
 
 ## Paso 8. Entrega
 
@@ -219,7 +250,7 @@ Si alguna ejecución falló, la evidencia queda en el log, en el archivo de esta
 
 ## Pruebas
 
-`pytest -q` corre 72 pruebas sin internet. Cubren la extracción con respuestas que tienen la misma forma de la API de Carroya, los estados de descarga, la búsqueda incompleta, la idempotencia de la consolidación, la reconstrucción de la base, el análisis de gangas, el correo en curso y sin datos, el envío con un servidor SMTP falso, las tareas de launchd, el modo según la fecha, el navegador de respaldo y la entrega sin credenciales. Una de ellas levanta un Carroya de mentira en el propio computador y prueba el navegador real contra él.
+`pytest -q` corre 112 pruebas sin internet. Cubren la extracción con respuestas que tienen la misma forma de la API de Carroya, los estados de descarga, la búsqueda incompleta, la idempotencia de la consolidación, la reconstrucción de la base, el análisis de gangas, el correo en curso y sin datos, el envío con un servidor SMTP falso, las tareas de launchd, el modo según la fecha, el navegador de respaldo, la entrega sin credenciales, los modelos adicionales en carpetas separadas, el cambio al puerto 587, los reintentos sin correos repetidos y la espera del correo a la recolección. Una de ellas levanta un Carroya de mentira en el propio computador y prueba el navegador real contra él.
 
 `python taller.py demo` simula seis días con anuncios nuevos, anuncios que salen, bajadas de precio, fallas de descarga y una búsqueda incompleta, y deja todo en `datos/demo` con `[DEMO]` en el asunto de los correos.
 
@@ -246,6 +277,7 @@ datos/                     se crea al ejecutar (no se sube a GitHub)
     correos/               copia de cada correo enviado
     estado/                estado de la ejecución de cada día
     logs/                  logs por ejecución y workflow.log
+  modelos/<modelo>/<modo>/ lo mismo para cada modelo adicional (mazda-3, kia-k3)
   launchd/                 salida de las tareas programadas del Mac
 entrega/                   lo que se agrega a mano y lo que genera "entregar"
 ```

@@ -394,7 +394,7 @@ Además, durante toda la semana, cuiden esto.
 * Wifi encendido.
 * Las actualizaciones automáticas de macOS apagadas, para que no reinicie el Mac de noche. Están en Ajustes del Sistema, General, Actualización de software, en el botón de información junto a Actualizaciones automáticas.
 
-### 3.2 Crear las dos tareas
+### 3.2 Crear las tres tareas
 
 ```bash
 cd ~/taller2-corolla && source .venv/bin/activate
@@ -404,8 +404,9 @@ python taller.py programar
 Debe salir esto.
 
 ```
-Tarea co.uniandes.taller2corolla.recoleccion cargada. Corre todos los días a las 08:00 (hora del Mac) el comando 'recolectar --programado'.
-Tarea co.uniandes.taller2corolla.correo cargada. Corre todos los días a las 11:00 (hora del Mac) el comando 'correo --programado'.
+Tarea co.uniandes.taller2corolla.recoleccion cargada. Corre todos los días (08:00, hora del Mac) el comando 'recolectar --programado'.
+Tarea co.uniandes.taller2corolla.correo cargada. Corre todos los días (11:00, hora del Mac) el comando 'correo --programado'.
+Tarea co.uniandes.taller2corolla.reintento cargada. Corre todos los días (cada 30 min de 11:30 a 23:30, hora del Mac) el comando 'correo --programado'.
 ------------------------------------------------------------------------
 Próximas ejecuciones:
   * domingo 15 de noviembre de 2026 a las 08:00, recolectar en modo prueba
@@ -417,6 +418,8 @@ Revise con: python taller.py estado-programacion
 
 Fíjense en que el domingo corre en modo prueba y desde el lunes en modo oficial. Eso lo decide la fecha, no hay que cambiar nada el lunes. Después del 21 las tareas no hacen nada.
 
+La tercera tarea, `reintento`, se agregó el 18 de noviembre. Vuelve a intentar el correo cada 30 minutos, pero solo lo envía si el del día todavía no ha salido, así que nunca llegan dos correos del mismo día.
+
 macOS puede mostrar un aviso de que se agregaron ítems en segundo plano. Es normal. **No los desactiven** en Ajustes del Sistema, General, Ítems de inicio (en algunas versiones se llama Ítems de inicio y extensiones), porque entonces las tareas no corren.
 
 ### 3.3 Revisar las tareas
@@ -425,7 +428,7 @@ macOS puede mostrar un aviso de que se agregaron ítems en segundo plano. Es nor
 python taller.py estado-programacion
 ```
 
-Las dos tareas deben decir `cargada=sí`. Hasta que corran por primera vez, `veces ejecutada` sale en 0.
+Las tres tareas deben decir `cargada=sí`. Hasta que corran por primera vez, `veces ejecutada` sale en 0.
 
 ### 3.4 Probar la programación ya mismo
 
@@ -441,7 +444,7 @@ Para ver lo que va haciendo, usen este comando en la misma Terminal. Con Ctrl C 
 tail -f datos/launchd/recoleccion.log
 ```
 
-Cuando termine (5 a 10 minutos), revisen.
+Cuando termine (unos 20 minutos, porque después del Corolla recorre los modelos adicionales), revisen.
 
 ```bash
 python taller.py estado-programacion
@@ -471,8 +474,9 @@ Guarden ese correo como PDF en `entrega/correos_prueba/` (cómo se hace está en
 ### Cada día
 
 * **Antes de dormir.** Mac conectado, tapa abierta, sesión iniciada y wifi encendido.
+* **En la mañana, si se llevan el Mac.** A las 8:00 sale el aviso "Empezó la recolección del día". No cierren la tapa hasta que salga el aviso "Terminó la recolección... Ya puedes cerrar la tapa" (puede tardar media hora). Con la tapa cerrada el Mac se duerme y la recolección se detiene hasta que lo abran.
 * **A las 8:30 o cuando puedan.** La Persona A revisa con los comandos de abajo que la recolección corrió. Debe aparecer una ejecución `REC-<fecha>-08...` con la etapa `ejecucion_completa` en `ok` o `con_advertencias`. También pueden escribir `/revisar-dia` en Antigravity.
-* **A las 11:10.** Los dos revisan que llegó el correo (sin `[PRUEBA]` en el asunto). Ese mismo día lo exportan como PDF a `entrega/correos_recibidos/correo_2026-11-DD.pdf` (parte 6.1) y lo suben a GitHub, así al final no hay que buscarlos.
+* **A las 11:10.** Los dos revisan que llegó el correo (sin `[PRUEBA]` en el asunto). Si a las 11:00 el Mac estaba cerrado o la red no dejó enviar, el correo sale solo apenas el Mac esté abierto y con una red que lo permita, en el siguiente reintento (cada 30 minutos, hasta las 23:30). Ese mismo día lo exportan como PDF a `entrega/correos_recibidos/correo_2026-11-DD.pdf` (parte 6.1) y lo suben a GitHub, así al final no hay que buscarlos.
 * **Si algo falló**, sigan la tabla y anoten lo que pasó en `docs/incidentes.md`.
 
 ```bash
@@ -487,12 +491,23 @@ python taller.py log --modo oficial
 | A las 8:30 no hay ninguna ejecución del día | El Mac estaba dormido o apagado. Enciéndanlo e inicien sesión. Si estaba dormido, launchd corre la tarea apenas despierta. Si a las 9:30 sigue sin correr, ejecútenla a mano con `python taller.py recolectar --modo oficial` y anótenlo. |
 | `ejecucion_completa` en `error` y el error dice que no se pudo leer la primera página | Revisen el wifi y abran carroya.com en el navegador. Prueben `python taller.py paso1 --visible`. Si funciona con la ventana visible, pongan `NAVEGADOR_VISIBLE=1` en el `.env` y repitan con `python taller.py recolectar --modo oficial` antes de las 11:00. Los archivos del intento fallido quedan en `diarios/reemplazados/`. |
 | Algunas descargas fallidas o búsqueda incompleta | Puede pasar. Queda registrado y el correo lo explica. No repitan el día salvo que haya fallado la mayoría de los anuncios. |
-| No llegó el correo a las 11:10 | Revisen spam. Luego `python taller.py log --modo oficial` y miren `correo_estado` y los errores. Si dice `no_enviado` o `fallido`, corrijan el `.env` y envíenlo con `python taller.py correo --modo oficial`. |
-| A las 11:00 la recolección seguía en curso | El correo lo dice, que es lo que pide el enunciado. No hay que hacer nada. Si quieren, cuando termine pueden enviar un segundo correo con `python taller.py correo --modo oficial` y lo anotan. |
+| No llegó el correo a las 11:10 | Revisen spam. Si el Mac estuvo cerrado o en una red que bloquea el correo, ábranlo en otra red (la de la casa sirve) y esperen el siguiente reintento, o láncenlo ya con `python taller.py probar-programacion reintento`. Si `python taller.py log --modo oficial` dice `SMTPAuthenticationError`, el problema es la contraseña del `.env`, no la red. |
+| A las 11:00 la recolección seguía en curso | El correo programado la espera hasta una hora y sale cuando termina. Si después de una hora sigue corriendo, el correo sale igual y lo dice. No hay que hacer nada. |
+| Salió el aviso "No se pudo enviar el correo" | No hay que hacer nada si después van a estar en una red que deje enviar. El Mac lo intenta solo cada 30 minutos hasta que salga. |
 | `datos/launchd/recoleccion.log` dice `Operation not permitted` | El proyecto quedó dentro de Documentos, Escritorio o Descargas. Vean la parte 7. |
 | `estado-programacion` dice `cargada=no` | Ejecuten `python taller.py programar` otra vez. |
 
 No modifiquen a mano nada dentro de `datos/oficial`. Son las evidencias de la entrega.
+
+### Modelos adicionales (desde el 19)
+
+Desde el 19 de noviembre la recolección de las 8:00 sigue también el Mazda 3 y el Kia K3, después del Corolla y con el mismo método. Quedan en `datos/modelos/` y aparecen al final del correo, en la sección Otros modelos monitoreados. El Corolla sigue siendo lo oficial del taller y si un modelo adicional falla no lo afecta. Para revisar que Carroya se lee bien, usen este comando.
+
+```bash
+python taller.py probar-modelos
+```
+
+Debe decir `SÍ` junto a Mazda 3 y junto a KIA K3 y terminar con `Todo bien.`
 
 ## Parte 5. Entender el código, paso por paso del taller
 
@@ -531,7 +546,7 @@ Para cada paso está lo que pide el enunciado, dónde está el código, cómo fu
 
 * **Qué pide.** Inicio automático a las 8:00 con búsqueda, descarga, consolidación y preparación del análisis, el correo programado aparte a las 11:00, las condiciones para que funcione y una prueba completa antes del 16.
 * **Dónde está.** `corolla/paso4_programacion.py`, la opción `--programado` de `taller.py` y `modo_programado` en `corolla/configuracion.py`.
-* **Cómo funciona.** `instalar` escribe dos archivos `.plist` en `~/Library/LaunchAgents` y los carga con `launchctl`. Cada uno ejecuta `caffeinate -i -s .venv/bin/python taller.py recolectar|correo --programado` con rutas absolutas. `modo_programado` decide por la fecha (prueba antes del 16, oficial del 16 al 21, nada después). Al empezar, el programa espera hasta diez minutos a que haya internet (`esperar_conexion`).
+* **Cómo funciona.** `instalar` escribe tres archivos `.plist` en `~/Library/LaunchAgents` y los carga con `launchctl`. Cada uno ejecuta `caffeinate -i -s .venv/bin/python taller.py recolectar|correo --programado` con rutas absolutas. El tercero es el reintento del correo, cada 30 minutos de 11:30 a 23:30, que solo envía si el correo del día no ha salido (`correo_ya_enviado` en `corolla/paso7_correo.py`). `modo_programado` decide por la fecha (prueba antes del 16, oficial del 16 al 21, nada después). Al empezar, el programa espera hasta diez minutos a que haya internet (`esperar_conexion`).
 * **Córranlo solo.** `python taller.py programar`, `python taller.py estado-programacion` y `python taller.py probar-programacion recolectar`.
 * **Qué revisar.** `datos/launchd/*.log`, la palabra `programado` en el log y la fila Cómo se inició del correo. Son la evidencia de las ejecuciones programadas.
 * **Pregúntenle a Antigravity.** "Explícame corolla/paso4_programacion.py, qué es launchd, qué hace caffeinate y qué condiciones necesita el Mac para que las tareas corran."
@@ -559,7 +574,7 @@ Para cada paso está lo que pide el enunciado, dónde está el código, cómo fu
 
 * **Qué pide.** Correo a las 11:00 con fecha y estado, enlaces, nuevos, descargas, errores y etapas pendientes, gráfica y resumen, y las gangas nuevas con enlace, características, precio, referencia y explicación. Debe salir aunque algo falle.
 * **Dónde está.** `corolla/paso7_correo.py` y `corolla/plantillas/correo.html`.
-* **Cómo funciona.** `reunir` junta lo que exista a esa hora (estado del día, manifiesto y resumen del análisis), `construir` llena la plantilla y pega la gráfica, `enviar` lo manda por Gmail con tres intentos y `guardar_copia` deja una copia. Si el armado falla, `mensaje_minimo` envía una versión corta con el error.
+* **Cómo funciona.** `reunir` junta lo que exista a esa hora (estado del día, manifiesto y resumen del análisis), `construir` llena la plantilla y pega la gráfica, `enviar` lo manda por Gmail con tres intentos, por el puerto 465 o, si la red lo bloquea, por el 587, y `guardar_copia` deja una copia. Si el armado falla, `mensaje_minimo` envía una versión corta con el error.
 * **Córranlo solo.** `python taller.py paso7 --sin-enviar` arma el correo sin enviarlo y dice cómo abrir la copia.
 * **Pregúntenle a Antigravity.** "Muéstrame qué dice el correo cuando la recolección sigue en curso a las 11:00 y dónde está ese caso en el código."
 
@@ -624,6 +639,8 @@ Suban `entrega_taller2_corolla.zip` a Bloque Neón antes del lunes 23 de noviemb
 | `Executable doesn't exist` o Chromium no abre | `python -m playwright install chromium` |
 | `Operation not permitted` en `datos/launchd/*.log` | El proyecto está en Documentos, Escritorio o Descargas. Muévanlo con `mv <carpeta> ~/taller2-corolla`, entren a la carpeta, borren y creen de nuevo el entorno (`rm -rf .venv`, `python3.12 -m venv .venv`, `source .venv/bin/activate`, `pip install -r requirements.txt`) y ejecuten `python taller.py programar` otra vez |
 | `SMTPAuthenticationError` o `535` | La contraseña no es de aplicación o tiene un error. Creen otra en la parte 1.7 y péguenla en el `.env` |
+| `ConnectionRefusedError` o `timed out` al enviar el correo | La red no deja enviar correo (pasa en algunas oficinas). El programa prueba solo el puerto 587, y si tampoco puede, el reintento lo envía cuando el Mac esté en otra red |
+| No aparecen los avisos del Mac | En Ajustes del Sistema, Notificaciones, busquen Editor de Scripts (Script Editor) y permitan sus notificaciones. Los avisos son una ayuda; el programa funciona igual sin ellos |
 | El correo llega a spam | Márquenlo como no spam y agreguen la cuenta que envía a sus contactos |
 | `pmset` dice `must be run as root` | Le faltó `sudo` al comienzo del comando |
 | En Windows, PowerShell no deja activar el entorno | Ejecuten una vez `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, respondan que sí y vuelvan a activar |

@@ -59,7 +59,8 @@ def test_si_el_mac_no_esta_en_hora_de_bogota_se_convierte(zona):
     assert p4.hora_local("correo") == (11, 0)
 
 
-def test_instalar_carga_las_dos_tareas(tmp_path, monkeypatch):
+def test_instalar_carga_las_tres_tareas(tmp_path, monkeypatch, zona):
+    zona("America/Bogota")
     llamadas = []
     monkeypatch.setattr(p4.sys, "platform", "darwin")
     monkeypatch.setattr(p4.Path, "home", lambda: tmp_path / "casa")
@@ -67,10 +68,15 @@ def test_instalar_carga_las_dos_tareas(tmp_path, monkeypatch):
                         type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})())
     creados = p4.instalar(raiz=tmp_path, registrar=lambda m: None)
     assert [r.name for r in creados] == ["co.uniandes.taller2corolla.recoleccion.plist",
-                                         "co.uniandes.taller2corolla.correo.plist"]
-    assert [a[0] for a in llamadas] == ["bootout", "bootstrap", "bootout", "bootstrap"]
+                                         "co.uniandes.taller2corolla.correo.plist",
+                                         "co.uniandes.taller2corolla.reintento.plist"]
+    assert [a[0] for a in llamadas] == ["bootout", "bootstrap"] * 3
     correo = plistlib.loads(creados[1].read_bytes())
     assert correo["ProgramArguments"][-2:] == ["correo", "--programado"]
+    reintento = plistlib.loads(creados[2].read_bytes())
+    assert reintento["ProgramArguments"][-2:] == ["correo", "--programado"]
+    horas = reintento["StartCalendarInterval"]
+    assert horas[0] == {"Hour": 11, "Minute": 30} and horas[-1] == {"Hour": 23, "Minute": 30} and len(horas) == 25
     assert (tmp_path / "datos" / "launchd").is_dir()
 
 
@@ -105,6 +111,7 @@ def test_tarea_programada_despues_del_periodo_no_hace_nada(monkeypatch, tmp_path
     monkeypatch.setenv("COROLLA_DATOS", str(tmp_path))
     with config.reloj_simulado(datetime(2026, 11, 22, 8, 0, tzinfo=config.ZONA_HORARIA)):
         assert taller.main(["recolectar", "--programado"]) == 0
+    with config.reloj_simulado(datetime(2026, 11, 22, 11, 0, tzinfo=config.ZONA_HORARIA)):
         assert taller.main(["correo", "--programado"]) == 0
     assert "terminó" in capsys.readouterr().out
     assert not (tmp_path / "oficial").exists() and not (tmp_path / "prueba").exists()

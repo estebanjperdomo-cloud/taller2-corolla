@@ -132,6 +132,7 @@ class ResultadoBusqueda:
     vistos: int = 0
     completa: bool = False
     motivo_incompleta: str | None = None
+    criterios: object = None                           # Busqueda de un modelo adicional (None = Corolla)
 
 
 def buscar_enlaces(fuente: FuenteCarroya, ids_conocidos: set[str],
@@ -139,9 +140,16 @@ def buscar_enlaces(fuente: FuenteCarroya, ids_conocidos: set[str],
                    registrar: Callable[[str], None] = print,
                    max_paginas: int = config.MAX_PAGINAS,
                    espera_reintentos: tuple[float, float] = config.ESPERA_ENTRE_REINTENTOS_S,
-                   plantilla_detalle: str = config.URL_DETALLE) -> ResultadoBusqueda:
-    """Recorre TODAS las páginas de resultados y junta los enlaces sin repetir."""
-    r = ResultadoBusqueda()
+                   plantilla_detalle: str = config.URL_DETALLE,
+                   busqueda=None) -> ResultadoBusqueda:
+    """Recorre TODAS las páginas de resultados y junta los enlaces sin repetir.
+
+    Sin 'busqueda' se aplican los criterios del taller (Toyota Corolla). Con una búsqueda
+    adicional (configuracion.MODELOS_EXTRA) se aplican los de ese modelo.
+    """
+    if busqueda is not None:
+        max_paginas = busqueda.max_paginas
+    r = ResultadoBusqueda(criterios=busqueda)
     vistos: set[str] = set()
 
     def procesar(pagina: int) -> None:
@@ -168,7 +176,8 @@ def buscar_enlaces(fuente: FuenteCarroya, ids_conocidos: set[str],
                 continue
             vistos.add(id_anuncio)
             nuevos_en_pagina += 1
-            cumple, motivo = extraccion.verificar_criterios(tarjeta["marca"], tarjeta["linea"], tarjeta["anio"])
+            cumple, motivo = extraccion.verificar_criterios(tarjeta["marca"], tarjeta["linea"], tarjeta["anio"],
+                                                            busqueda)
             if not cumple:
                 r.descartados.append({"id_anuncio": id_anuncio, "url": tarjeta["url"],
                                       "pagina_busqueda": pagina, "motivo": motivo})
@@ -254,7 +263,8 @@ def descargar_anuncios(fuente: FuenteCarroya, busqueda: ResultadoBusqueda,
         fila["fecha_hora_descarga"] = momento
         if respuesta is not None:
             try:
-                fila.update(extraccion.campos_detalle(respuesta, id_anuncio, busqueda.tarjetas.get(id_anuncio)))
+                fila.update(extraccion.campos_detalle(respuesta, id_anuncio, busqueda.tarjetas.get(id_anuncio),
+                                                      busqueda.criterios))
             except Exception as exc:
                 error = f"no se pudieron extraer los datos: {exc}"
             else:
@@ -303,8 +313,12 @@ def ejecutar_paso_1(fuente: FuenteCarroya, rutas: config.Rutas, fecha: date, run
                     guardar_estado: Callable[[], None] | None = None,
                     max_anuncios: int | None = None,
                     espera_reintentos: tuple[float, float] = config.ESPERA_ENTRE_REINTENTOS_S,
-                    plantilla_detalle: str = config.URL_DETALLE) -> dict:
-    """Búsqueda + descarga. Devuelve el manifiesto del día (también lo guarda)."""
+                    plantilla_detalle: str = config.URL_DETALLE,
+                    criterios=None) -> dict:
+    """Búsqueda + descarga. Devuelve el manifiesto del día (también lo guarda).
+
+    criterios es una configuracion.Busqueda para los modelos adicionales; sin ella es el Corolla.
+    """
     rutas.crear()
     apartar_archivos_previos(rutas, fecha, bitacora.info)
     carpeta_crudos = rutas.crudos_dia(fecha)
@@ -323,7 +337,8 @@ def ejecutar_paso_1(fuente: FuenteCarroya, rutas: config.Rutas, fecha: date, run
     busqueda = ResultadoBusqueda(motivo_incompleta="la etapa de búsqueda no terminó")
     with bitacora.etapa("busqueda") as etapa:
         busqueda = buscar_enlaces(fuente, ids_conocidos, guardar_crudo, bitacora.info,
-                                  espera_reintentos=espera_reintentos, plantilla_detalle=plantilla_detalle)
+                                  espera_reintentos=espera_reintentos, plantilla_detalle=plantilla_detalle,
+                                  busqueda=criterios)
         escribir_csv(rutas.enlaces(fecha), busqueda.enlaces.values(), COLUMNAS_ENLACES)
         etapa.metricas.update(
             paginas_esperadas=busqueda.paginas_esperadas,
@@ -371,9 +386,12 @@ def ejecutar_paso_1(fuente: FuenteCarroya, rutas: config.Rutas, fecha: date, run
         "modo": rutas.modo,
         "generado_en": config.iso(config.ahora()),
         "zona_horaria": config.NOMBRE_ZONA,
-        "url_busqueda": config.URL_BUSQUEDA.format(pagina=1),
-        "criterios": {"marca": config.MARCA, "linea": config.LINEA,
-                      "anio_min": config.ANIO_MIN, "anio_max": config.ANIO_MAX},
+        "url_busqueda": (criterios.url if criterios else config.URL_BUSQUEDA).format(pagina=1),
+        "criterios": ({"modelo": criterios.nombre, "marca": criterios.marca, "linea": criterios.linea,
+                       "excluir": list(criterios.excluir), "anio_min": criterios.anio_min,
+                       "anio_max": criterios.anio_max} if criterios else
+                      {"marca": config.MARCA, "linea": config.LINEA,
+                       "anio_min": config.ANIO_MIN, "anio_max": config.ANIO_MAX}),
         "total_reportado_por_carroya": busqueda.total_reportado,
         "paginas_esperadas": busqueda.paginas_esperadas,
         "paginas_leidas": sorted(busqueda.paginas_ok),

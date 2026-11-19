@@ -1,10 +1,14 @@
 """Paso 4 del taller (10 %). Ejecución automática diaria en el Mac con launchd.
 
 macOS trae launchd, el programador de tareas del propio sistema (cumple el papel de
-cron). Este módulo crea dos tareas independientes en ~/Library/LaunchAgents
+cron). Este módulo crea tres tareas independientes en ~/Library/LaunchAgents
 
   co.uniandes.taller2corolla.recoleccion   todos los días a las 8:00 (pasos 1, 3 y 6)
   co.uniandes.taller2corolla.correo        todos los días a las 11:00 (paso 7)
+  co.uniandes.taller2corolla.reintento     cada 30 minutos de 11:30 a 23:30. Envía el correo
+                                           del día solo si todavía no ha salido (por ejemplo,
+                                           si a las 11:00 la red bloqueó el envío o el Mac
+                                           estaba dormido)
 
 Cada tarea ejecuta, con rutas absolutas,
   /usr/bin/caffeinate -i -s  .venv/bin/python  taller.py  recolectar|correo  --programado
@@ -21,6 +25,11 @@ Condiciones para que funcione (también están en la guía)
   * la carpeta del proyecto fuera de Documentos, Escritorio y Descargas, porque macOS
     no deja que las tareas programadas lean esas carpetas.
 Si a las 8:00 el Mac estaba dormido, launchd corre la tarea apenas el Mac se despierte.
+Por eso el correo programado
+  * espera a que termine la recolección si la encuentra corriendo (máximo una hora),
+  * no se repite si el correo de ese día ya salió,
+  * y si arranca antes de las 11:00 es una tarea que el Mac se perdió ayer, así que envía
+    el correo de ayer (solo si no había salido) y no el de hoy.
 """
 from __future__ import annotations
 
@@ -28,17 +37,21 @@ import os
 import plistlib
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from pathlib import Path
 
 from . import configuracion as config
 
 PREFIJO = "co.uniandes.taller2corolla"
-# tarea -> (comando de taller.py, hora de Bogotá)
+# Reintentos del correo: cada 30 minutos de 11:30 a 23:30 (solo envían si falta el del día)
+HORAS_REINTENTO = tuple(time(h, m) for h in range(11, 24) for m in (0, 30) if time(h, m) >= time(11, 30))
+# tarea -> (comando de taller.py, horas de Bogotá)
 TAREAS = {
-    "recoleccion": ("recolectar", config.HORA_RECOLECCION),
-    "correo": ("correo", config.HORA_CORREO),
+    "recoleccion": ("recolectar", (config.HORA_RECOLECCION,)),
+    "correo": ("correo", (config.HORA_CORREO,)),
+    "reintento": ("correo", HORAS_REINTENTO),
 }
+PRINCIPALES = ("recoleccion", "correo")
 
 
 def etiqueta(tarea: str) -> str:
@@ -61,24 +74,38 @@ def python_del_proyecto(raiz: Path = config.RAIZ_PROYECTO) -> Path:
     return candidato if candidato.exists() else Path(sys.executable)
 
 
-def hora_local(tarea: str) -> tuple[int, int]:
+def horas_locales(tarea: str) -> list[tuple[int, int]]:
     """launchd usa la hora del Mac. Si el Mac no está en hora de Bogotá, se convierte."""
-    hora = TAREAS[tarea][1]
-    en_bogota = datetime.combine(config.PERIODO_INICIO, hora, tzinfo=config.ZONA_HORARIA)
-    local = en_bogota.astimezone()  # zona horaria del sistema
-    return local.hour, local.minute
+    salida = []
+    for hora in TAREAS[tarea][1]:
+        en_bogota = datetime.combine(config.PERIODO_INICIO, hora, tzinfo=config.ZONA_HORARIA)
+        local = en_bogota.astimezone()  # zona horaria del sistema
+        salida.append((local.hour, local.minute))
+    return salida
+
+
+def hora_local(tarea: str) -> tuple[int, int]:
+    """La primera hora de la tarea en la hora del Mac."""
+    return horas_locales(tarea)[0]
+
+
+def describir_horas(tarea: str) -> str:
+    horas = horas_locales(tarea)
+    if len(horas) == 1:
+        return "%02d:%02d" % horas[0]
+    return "cada 30 min de %02d:%02d a %02d:%02d" % (horas[0] + horas[-1])
 
 
 def contenido_plist(tarea: str, raiz: Path = config.RAIZ_PROYECTO, python: Path | None = None) -> dict:
     comando = TAREAS[tarea][0]
-    hora, minuto = hora_local(tarea)
+    horas = [{"Hour": h, "Minute": m} for h, m in horas_locales(tarea)]
     salida = carpeta_salidas(raiz) / f"{tarea}.log"
     return {
         "Label": etiqueta(tarea),
         "ProgramArguments": ["/usr/bin/caffeinate", "-i", "-s", str(python or python_del_proyecto(raiz)),
                              str(raiz / "taller.py"), comando, "--programado"],
         "WorkingDirectory": str(raiz),
-        "StartCalendarInterval": {"Hour": hora, "Minute": minuto},
+        "StartCalendarInterval": horas[0] if len(horas) == 1 else horas,
         "StandardOutPath": str(salida),
         "StandardErrorPath": str(salida),
         "EnvironmentVariables": {
@@ -106,7 +133,7 @@ def _exigir_mac() -> None:
 
 
 def instalar(raiz: Path = config.RAIZ_PROYECTO, registrar=print) -> list[Path]:
-    """Crea (o reemplaza) las dos tareas y las carga en launchd."""
+    """Crea (o reemplaza) las tres tareas y las carga en launchd."""
     _exigir_mac()
     carpeta_salidas(raiz).mkdir(parents=True, exist_ok=True)
     creados = []
@@ -119,9 +146,8 @@ def instalar(raiz: Path = config.RAIZ_PROYECTO, registrar=print) -> list[Path]:
         resultado = _launchctl("bootstrap", _dominio(), str(ruta))
         if resultado.returncode != 0:
             raise RuntimeError(f"launchctl no pudo cargar {ruta.name}: {(resultado.stderr or resultado.stdout).strip()}")
-        hora, minuto = hora_local(tarea)
-        registrar(f"Tarea {etiqueta(tarea)} cargada. Corre todos los días a las {hora:02d}:{minuto:02d} "
-                  f"(hora del Mac) el comando '{TAREAS[tarea][0]} --programado'.")
+        registrar(f"Tarea {etiqueta(tarea)} cargada. Corre todos los días ({describir_horas(tarea)}, hora del Mac) "
+                  f"el comando '{TAREAS[tarea][0]} --programado'.")
         creados.append(ruta)
     return creados
 
@@ -161,7 +187,7 @@ def estado(raiz: Path = config.RAIZ_PROYECTO) -> list[dict]:
             "estado": _leer_campo(info.stdout, "state") if cargada else None,
             "veces_ejecutada": _leer_campo(info.stdout, "runs") if cargada else None,
             "ultimo_codigo_salida": _leer_campo(info.stdout, "last exit code") if cargada else None,
-            "hora_local": "%02d:%02d" % hora_local(tarea),
+            "hora_local": describir_horas(tarea),
             "archivo_salida": str(salida),
             "ultimas_lineas": ultimas,
         })
@@ -184,7 +210,8 @@ def proximas_ejecuciones(desde: datetime | None = None, cantidad: int = 4) -> li
     eventos = []
     dia = desde.date()
     while len(eventos) < cantidad and dia <= config.PERIODO_FIN + timedelta(days=1):
-        for tarea, (comando, hora) in TAREAS.items():
+        for tarea in PRINCIPALES:
+            comando, hora = TAREAS[tarea][0], TAREAS[tarea][1][0]
             momento = datetime.combine(dia, hora, tzinfo=config.ZONA_HORARIA)
             if momento > desde:
                 modo = config.modo_programado(dia)

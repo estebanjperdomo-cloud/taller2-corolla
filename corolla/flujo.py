@@ -2,6 +2,8 @@
 
   8:00   ejecutar_recoleccion()   paso 1 (búsqueda y descarga), paso 3 (consolidación)
                                   y paso 6 (análisis listo para el correo)
+         ejecutar_modelos_extra() lo mismo para los modelos adicionales (Mazda 3 y Kia K3),
+                                  cada uno en su carpeta, después del Corolla
   11:00  ejecutar_correo()        paso 7, arma y envía el correo con lo que exista a esa hora
 
 Cada paso también se puede correr solo (python taller.py paso1, paso3, paso6, paso7).
@@ -70,8 +72,11 @@ def correr_paso1(dia: Dia, crear_fuente: Callable[[], object] | None = None,
                  crear_fuente_respaldo: Callable[[], object] | None = None,
                  max_anuncios: int | None = None,
                  espera_reintentos: tuple[float, float] = config.ESPERA_ENTRE_REINTENTOS_S,
-                 plantilla_detalle: str = config.URL_DETALLE) -> dict:
+                 plantilla_detalle: str = config.URL_DETALLE, busqueda=None) -> dict:
     """Busca todos los enlaces y descarga cada anuncio. Devuelve el manifiesto del día.
+
+    Sin 'busqueda' es el Toyota Corolla del taller. Con una configuracion.Busqueda es un
+    modelo adicional (Mazda 3, Kia K3...), con su propia dirección y sus propios criterios.
 
     crear_fuente es la forma de leer Carroya. Por defecto es el navegador real; las
     pruebas y la demostración pasan un Carroya simulado. Si la primera página no se
@@ -80,16 +85,17 @@ def correr_paso1(dia: Dia, crear_fuente: Callable[[], object] | None = None,
     conocidos = base.ids_conocidos(dia.rutas.bd, dia.fecha)
     if crear_fuente is None:  # ejecución real contra Carroya
         esperar_conexion(registrar=dia.bitacora.info)
-        crear_fuente = lambda: NavegadorCarroya()  # noqa: E731
+        url = busqueda.url if busqueda else config.URL_BUSQUEDA
+        crear_fuente = lambda: NavegadorCarroya(url_busqueda=url)  # noqa: E731
         if crear_fuente_respaldo is None and os.environ.get("NAVEGADOR_VISIBLE", "").lower() not in VISIBLE:
-            crear_fuente_respaldo = lambda: NavegadorCarroya(con_ventana=True)  # noqa: E731
+            crear_fuente_respaldo = lambda: NavegadorCarroya(con_ventana=True, url_busqueda=url)  # noqa: E731
 
     def intentar(fabrica) -> dict:
         with _abrir_fuente(fabrica) as fuente:
             return recoleccion.ejecutar_paso_1(
                 fuente, dia.rutas, dia.fecha, dia.run_id, dia.bitacora, conocidos, dia.estado, dia.guardar,
                 max_anuncios=max_anuncios, espera_reintentos=espera_reintentos,
-                plantilla_detalle=plantilla_detalle)
+                plantilla_detalle=plantilla_detalle, criterios=busqueda)
 
     manifiesto = intentar(crear_fuente)
     if manifiesto.get("paginas_esperadas") is None and crear_fuente_respaldo is not None:
@@ -184,6 +190,44 @@ def ejecutar_recoleccion(rutas: config.Rutas, fecha: date,
         dia.bitacora.cerrar()
 
 
+# --- Modelos adicionales (Mazda 3, Kia K3), después del Corolla ---------------------------------
+def ejecutar_modelos_extra(modo: str, fecha: date, origen: str = "manual",
+                           crear_fuente_por_modelo: dict | None = None,
+                           max_anuncios: int | None = None,
+                           espera_reintentos: tuple[float, float] = config.ESPERA_ENTRE_REINTENTOS_S,
+                           consola: bool = True, modelos=None,
+                           plantilla_detalle: str = config.URL_DETALLE) -> list[dict]:
+    """Pasos 1, 3 y 6 para cada modelo adicional, cada uno en su propia carpeta y su propia base.
+
+    Corre después del Corolla y por separado: si un modelo falla, no afecta al Corolla ni a
+    los demás modelos. crear_fuente_por_modelo lo usan las pruebas ({clave: fábrica}).
+    """
+    resumenes = []
+    for busqueda in (config.MODELOS_EXTRA if modelos is None else modelos):
+        rutas = config.rutas_modelo(busqueda, modo)
+        dia = Dia(rutas, fecha, origen=origen, consola=consola, nueva=True)
+        dia.estado["modelo"] = busqueda.nombre
+        dia.bitacora.info(f"Recolección adicional de {busqueda.nombre} del {fecha.isoformat()} en modo {modo}.")
+        try:
+            fabrica = (crear_fuente_por_modelo or {}).get(busqueda.clave)
+            correr_paso1(dia, crear_fuente=fabrica, max_anuncios=max_anuncios,
+                         espera_reintentos=espera_reintentos, plantilla_detalle=plantilla_detalle,
+                         busqueda=busqueda)
+            correr_paso3(dia)
+            correr_paso6(dia)
+            cerrar_dia(dia)
+        except Exception as exc:  # un modelo adicional nunca debe tumbar el resto
+            dia.bitacora.logger.error("Falló la recolección de %s\n%s", busqueda.nombre, traceback.format_exc())
+            dia.estado["errores"].append(f"{busqueda.nombre}, {type(exc).__name__}: {exc}")
+            dia.estado["estado"] = estado_mod.FALLIDA
+            dia.guardar()
+        finally:
+            dia.bitacora.cerrar()
+        resumenes.append({"clave": busqueda.clave, "nombre": busqueda.nombre, "estado": dia.estado["estado"],
+                          "metricas": dia.estado["metricas"], "errores": dia.estado["errores"]})
+    return resumenes
+
+
 # --- Lo que corre a las 11:00 -----------------------------------------------------------------
 def ejecutar_correo(rutas: config.Rutas, fecha: date, enviar: bool = True, consola: bool = True,
                     origen: str = "manual") -> dict:
@@ -210,8 +254,9 @@ def ejecutar_correo(rutas: config.Rutas, fecha: date, enviar: bool = True, conso
         if enviar:
             host = os.environ.get("SMTP_HOST") or "smtp.gmail.com"
             if origen == "programado" and host not in ("localhost", "127.0.0.1"):
-                esperar_conexion(host, int(os.environ.get("SMTP_PORT") or 465), max_espera_s=300,
-                                 registrar=bitacora.info)
+                # Basta con que conecte uno de los dos puertos de Gmail (algunas redes bloquean el 465).
+                puertos = tuple(dict.fromkeys((int(os.environ.get("SMTP_PORT") or 465), 465, 587)))
+                esperar_conexion(host, puertos, max_espera_s=300, registrar=bitacora.info)
             resultado["estado"], resultado["detalle"] = correo.enviar(mensaje)
         else:
             resultado["detalle"] = "envío desactivado; solo se guardó la copia"

@@ -163,7 +163,7 @@ class NavegadorCarroya:
         return self._abrir_y_capturar(url, lambda r: f"{config.API_DETALLE}{id_anuncio}" in r.url)
 
 
-def esperar_conexion(host: str = "www.carroya.com", puerto: int = 443,
+def esperar_conexion(host: str = "www.carroya.com", puerto: int | tuple[int, ...] = 443,
                      max_espera_s: float = config.ESPERA_INTERNET_MAX_S, intervalo_s: float = 15,
                      registrar=print) -> bool:
     """Espera a que haya internet antes de empezar.
@@ -171,24 +171,30 @@ def esperar_conexion(host: str = "www.carroya.com", puerto: int = 443,
     A las 8:00 el Mac puede venir de estar dormido y tardar unos segundos o minutos en
     conectarse al wifi. En lugar de fallar de inmediato, se intenta abrir una conexión
     con el sitio cada 'intervalo_s' segundos, hasta 'max_espera_s'. Devuelve True si hay conexión.
+    'puerto' puede ser una lista de puertos. Basta con que uno conecte (el correo usa 465 o 587,
+    porque algunas redes bloquean uno de los dos).
     """
+    puertos = tuple(puerto) if isinstance(puerto, (tuple, list)) else (puerto,)
     inicio = time.monotonic()
     intento = 0
     while True:
         intento += 1
-        try:
-            with socket.create_connection((host, puerto), timeout=10):
-                if intento > 1:
-                    registrar(f"Conexión con {host} lista después de {time.monotonic() - inicio:.0f} s.")
-                return True
-        except OSError as exc:
-            esperado = time.monotonic() - inicio
-            if esperado >= max_espera_s:
-                registrar(f"Sin conexión con {host} después de {esperado:.0f} s ({exc}).")
-                return False
-            if intento == 1:
-                registrar(f"Todavía no hay conexión con {host} ({exc}); se reintenta cada {intervalo_s:.0f} s.")
-            time.sleep(intervalo_s)
+        error = None
+        for p in puertos:
+            try:
+                with socket.create_connection((host, p), timeout=10):
+                    if intento > 1:
+                        registrar(f"Conexión con {host} lista después de {time.monotonic() - inicio:.0f} s.")
+                    return True
+            except OSError as exc:
+                error = exc
+        esperado = time.monotonic() - inicio
+        if esperado >= max_espera_s:
+            registrar(f"Sin conexión con {host} después de {esperado:.0f} s ({error}).")
+            return False
+        if intento == 1:
+            registrar(f"Todavía no hay conexión con {host} ({error}); se reintenta cada {intervalo_s:.0f} s.")
+        time.sleep(intervalo_s)
 
 
 class FuenteNoDisponible:
