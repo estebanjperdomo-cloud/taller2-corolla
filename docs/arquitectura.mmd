@@ -1,11 +1,12 @@
 flowchart LR
-    C(["Carroya.com<br/>páginas públicas"]) --> P1
+    C(["Carroya.com<br/>páginas públicas<br/>Corolla, Mazda 3 y Kia K3"]) --> P1
     T8{{"8:00 · launchd<br/>en el Mac"}} --> P1["Paso 1<br/>búsqueda de enlaces<br/>y descarga<br/>(Playwright)"]
     P1 -->|"enlaces_FECHA.csv<br/>datos_FECHA.csv"| P3["Paso 3<br/>procesar_dia()<br/>idempotente"]
-    P3 --> BD[("Paso 2<br/>corolla.sqlite<br/>anuncios<br/>observaciones<br/>cambios")]
-    BD --> P6["Paso 6<br/>precio esperado<br/>y posibles gangas"]
-    P6 -->|"gráfica y<br/>resumen"| P7["Paso 7<br/>plantilla<br/>y envío"]
+    P3 --> BD[("Paso 2<br/>SQLite<br/>anuncios<br/>observaciones<br/>cambios<br/>(una base por modelo)")]
+    BD --> P6["Paso 6<br/>precio esperado<br/>y posibles gangas<br/>(cada modelo aparte)"]
+    P6 -->|"gráfica y<br/>resumen"| P7["Paso 7<br/>plantilla y envío<br/>puerto 465 o 587"]
     T11{{"11:00 · launchd<br/>en el Mac"}} --> P7
+    TR{{"cada 30 min · launchd<br/>reintento solo si falta<br/>el correo del día"}} -.-> P7
     P7 --> G(["Gmail de<br/>la pareja"])
     P1 -.-> L["Paso 5<br/>logs JSONL de cada etapa<br/>(America/Bogota)"]
     P3 -.-> L

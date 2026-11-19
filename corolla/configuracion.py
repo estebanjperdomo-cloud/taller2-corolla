@@ -187,8 +187,9 @@ def carpeta_datos() -> Path:
 
 
 def rutas_modelo(busqueda: "Busqueda", modo: str) -> "Rutas":
-    """Carpetas de un modelo adicional, separadas del Corolla: datos/modelos/<clave>/<modo>/..."""
-    return Rutas(modo, carpeta_datos() / "modelos" / busqueda.clave)
+    """Carpetas de un modelo adicional, separadas del Corolla, en datos/modelos/<clave>/<modo>/.
+    Su base lleva el nombre del modelo (mazda_3.sqlite, kia_k3.sqlite)."""
+    return Rutas(modo, carpeta_datos() / "modelos" / busqueda.clave, f"{busqueda.clave.replace('-', '_')}.sqlite")
 
 
 @dataclass(frozen=True)
@@ -198,6 +199,7 @@ class Rutas:
 
     modo: str
     raiz: Path = field(default_factory=carpeta_datos)
+    archivo_bd: str = "corolla.sqlite"     # los modelos adicionales usan el suyo
 
     def __post_init__(self):
         if self.modo not in MODOS:
@@ -226,7 +228,7 @@ class Rutas:
 
     @property
     def bd(self) -> Path:
-        return self.consolidado / "corolla.sqlite"
+        return self.consolidado / self.archivo_bd
 
     @property
     def reportes(self) -> Path:

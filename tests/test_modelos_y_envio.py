@@ -116,7 +116,9 @@ def test_modelos_adicionales_en_carpetas_separadas_y_en_el_correo(tmp_path, monk
     aceptados = manifiesto["enlaces_que_cumplen_criterios"]
     assert 0 < aceptados < 41 and len(manifiesto["descartados_por_criterios"]) == 41 - aceptados
     assert all("CX-30" in d["motivo"] for d in manifiesto["descartados_por_criterios"])
-    assert rutas.bd.exists()
+    assert rutas.bd.exists() and rutas.bd.name == "mazda_3.sqlite"
+    assert config.rutas_modelo(KIA_K3, "oficial").bd.name == "kia_k3.sqlite"
+    assert config.Rutas("oficial").bd.name == "corolla.sqlite"
     assert not (tmp_path / "prueba").exists()          # el Corolla no se tocó
 
     # El correo del Corolla incluye la sección de los modelos adicionales

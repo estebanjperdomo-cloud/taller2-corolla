@@ -1,0 +1,16 @@
+flowchart TD
+    A(["Arranca una tarea del correo<br/>11:00 o un reintento"]) --> B{"¿Arrancó antes<br/>de las 11:00?"}
+    B -- "sí, viene de ayer" --> C["Le toca el correo de ayer"]
+    B -- no --> D["Le toca el correo de hoy"]
+    C --> E{"¿Ese correo<br/>ya salió?"}
+    D --> E
+    E -- sí --> F(["No hace nada"])
+    E -- no --> G{"¿La recolección<br/>está corriendo?"}
+    G -- sí --> H["La espera<br/>hasta una hora"]
+    G -- no --> I["Arma el correo"]
+    H --> I
+    I --> J{"¿Conecta por<br/>el puerto 465?"}
+    J -- sí --> K(["Correo enviado"])
+    J -- no --> L{"¿Conecta por<br/>el puerto 587?"}
+    L -- sí --> K
+    L -- no --> M(["Aviso en el Mac y<br/>nuevo intento en 30 minutos"])

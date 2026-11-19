@@ -41,4 +41,5 @@ Un monitor que todos los días a las 8:00 (hora de Bogotá) busca en Carroya los
 * Después de cualquier cambio en `corolla/` o en `taller.py`, corre `python -m pytest -q` y muestra el resultado.
 * Mantén el estilo del código. Nombres en español, funciones cortas y comentarios que explican el porqué.
 * Si un cambio afecta una decisión del taller (identificador, almacenamiento, actualización, automatización o detección de gangas), actualiza también README.md y dilo en tu respuesta.
+* Anota cada cambio en CAMBIOS.md. Si además es una decisión, explica en DECISIONES.md el problema, las opciones que se consideraron, lo que se escogió y cómo se comprobó.
 * Del 16 al 21 de noviembre cualquier cambio de código llega a la ejecución del día siguiente. Durante esos días prefiere no cambiar código salvo que haya una falla, y si hay que hacerlo, corre las pruebas antes.

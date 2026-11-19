@@ -8,6 +8,15 @@ Taller 2 del Taller de Programación Aplicada en Python. El programa consulta to
 
 El enunciado pide usar un coding agent para desarrollar la solución y poder explicar las decisiones. La primera versión del código la escribió Claude y la pareja la revisa, la ejecuta y la ajusta con Antigravity, que lee las reglas del proyecto en [AGENTS.md](AGENTS.md) y tiene tres habilidades propias en `.agents/skills` (revisar el día, explicar un paso y preparar la entrega). El proceso diario no depende de ningún agente. Es un pipeline de Python que el Mac ejecuta solo con launchd, como permite el enunciado.
 
+## Versiones y decisiones
+
+| Versión | Fecha | Qué trae |
+|---|---|---|
+| 1.0 | 14 de noviembre | Monitor del Corolla, con la recolección a las 8:00 y el correo a las 11:00 |
+| 1.1 | 18 de noviembre | Mazda 3 y Kia K3 como modelos adicionales, y un correo que llega aunque la red bloquee un puerto o el Mac haya estado dormido |
+
+La historia completa está en [DECISIONES.md](DECISIONES.md), con el problema que motivó cada decisión, las opciones que se descartaron y cómo se comprobó cada cambio. La lista de cambios por versión está en [CAMBIOS.md](CAMBIOS.md) y las fallas del periodo en [docs/incidentes.md](docs/incidentes.md).
+
 ## Arquitectura
 
 ![Arquitectura](docs/arquitectura.png)
@@ -235,7 +244,7 @@ Cómo se hizo.
 
 * Se reutilizan los mismos pasos 1, 3 y 6. Cada modelo es una `Busqueda` en `MODELOS_EXTRA` de `corolla/configuracion.py`, con su dirección y sus criterios.
 * Cada anuncio se revisa contra la marca, la línea y los años. La línea se compara por su primera palabra después de quitar la marca, así "3", "Mazda 3" y "MAZDA3" son Mazda 3 y "CX-30" no. El Kia K3 Cross se descarta porque es otro carro.
-* Cada modelo tiene su propia carpeta, `datos/modelos/<modelo>/<modo>/`, con sus archivos diarios, su base SQLite, sus logs y sus reportes. Así nunca se mezclan con las evidencias del Corolla.
+* Cada modelo tiene su propia carpeta, `datos/modelos/<modelo>/<modo>/`, con sus archivos diarios, su base SQLite (`mazda_3.sqlite` o `kia_k3.sqlite`), sus logs y sus reportes. Así nunca se mezclan con las evidencias del Corolla.
 * Cada carro se compara solo con anuncios de su mismo modelo. El modelo de precios y la regla de alerta son los mismos. Los grupos de versión reconocen los niveles de cada marca (Prime, Touring, Grand Touring, Carbon Edition y Signature en Mazda, y GT Line, Zenith, Vibrant y Desire en Kia).
 * Corren después del Corolla, en la misma tarea de las 8:00. Si un modelo falla no afecta al Corolla ni al otro modelo, y el error queda en su log.
 * `python taller.py probar-modelos` muestra qué líneas trae cada página y cuáles se aceptan, y `python taller.py modelos --max-anuncios 3` hace una prueba rápida.
@@ -261,10 +270,12 @@ taller.py                  comandos (python taller.py --help)
 corolla/                   código, un archivo por paso del taller
   plantillas/correo.html   plantilla del correo
 tests/                     pruebas (pytest)
-docs/                      diagrama, esqueleto del documento de una página e incidentes
+docs/                      diagramas, esqueleto del documento de una página e incidentes
 .agents/skills/            habilidades para Antigravity
 AGENTS.md                  reglas del proyecto para el agente de programación
 GUIA_PASO_A_PASO.md        qué hacer, en orden
+DECISIONES.md              historia del proyecto y razones de cada decisión
+CAMBIOS.md                 qué trae cada versión
 consultas.sql              consultas del paso 2
 requirements.txt           dependencias
 .env.example               plantilla de credenciales (se copia como .env)
