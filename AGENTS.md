@@ -16,6 +16,7 @@ Un monitor que todos los días a las 8:00 (hora de Bogotá) busca en Carroya los
 | 4. Automatización | corolla/paso4_programacion.py y la opción --programado de taller.py |
 | 5. Logs | corolla/paso5_bitacora.py, corolla/estado.py |
 | 6. Precios y gangas | corolla/paso6_analisis.py, corolla/paso6_grafica.py |
+| Comparación entre modelos | corolla/comparacion.py |
 | 7. Correo | corolla/paso7_correo.py, corolla/plantillas/correo.html |
 | 8. Entrega | corolla/paso8_entrega.py |
 | Orquestación, comandos y avisos del Mac | corolla/flujo.py, taller.py, corolla/avisos.py |
@@ -29,6 +30,7 @@ Un monitor que todos los días a las 8:00 (hora de Bogotá) busca en Carroya los
 * `python taller.py demo` simula seis días sin internet.
 * `python taller.py log` resume los logs de hoy y `python taller.py verificar` revisa la instalación.
 * `python taller.py probar-modelos` muestra qué anuncios reconoce en las páginas de los modelos adicionales.
+* `python taller.py comparar` compara el Corolla con el Mazda 3 y el Kia K3 el último día común.
 
 ## Reglas
 
@@ -36,6 +38,7 @@ Un monitor que todos los días a las 8:00 (hora de Bogotá) busca en Carroya los
 * No llames directamente a la API interna de Carroya ni inventes encabezados o cambies el user agent. La lectura de Carroya se hace solo con `corolla/paso1_navegador.py`, que abre las páginas públicas en Chromium y lee la respuesta que la propia página recibe.
 * No guardes datos personales de los vendedores (nombre, teléfono, correo, dirección, placa). `paso1_extraccion.sanitizar` los quita.
 * No modifiques a mano nada dentro de `datos/oficial` ni de `datos/modelos/*/oficial`. Son las evidencias de la entrega.
+* Nunca inventes ni rellenes datos de un día sin recolección. Los días perdidos se cuentan en `docs/incidentes.md` y en `DIAS_SIN_DATOS`.
 * Las ejecuciones manuales van en modo prueba, que es el modo por defecto. Usa `--modo oficial` solo para recuperar un día que falló y pide permiso antes.
 * No ejecutes `python taller.py programar`, `desprogramar`, `probar-programacion`, comandos con `sudo`, `git push` ni nada que envíe correos sin que los estudiantes lo pidan.
 * Después de cualquier cambio en `corolla/` o en `taller.py`, corre `python -m pytest -q` y muestra el resultado.

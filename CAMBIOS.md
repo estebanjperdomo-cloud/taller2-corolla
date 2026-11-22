@@ -2,9 +2,26 @@
 
 Cada versión lista lo que se agregó, lo que cambió y lo que se corrigió. El porqué de cada cambio, las opciones que se descartaron y cómo se comprobó están en [DECISIONES.md](DECISIONES.md).
 
+## Versión 1.2 · 22 de noviembre de 2026
+
+Cierre del periodo oficial.
+
+### Agregado
+* Comando `comparar` (`corolla/comparacion.py`), que pone al Corolla, el Mazda 3 y el Kia K3 lado a lado el último día común. Compara los precios por año del modelo, mide el efecto del año y del kilometraje con un mismo modelo simple para los tres y resume el periodo común. Escribe tabla, detalle y gráfica en `entrega/comparacion/`.
+* Gráfica de la comparación en el README (`docs/comparacion_modelos.png`) y sección de resultados del periodo.
+* Decisión 10 en [DECISIONES.md](DECISIONES.md) y lo que pasó del 19 al 22 en `docs/incidentes.md`.
+
+### Cambiado
+* `python taller.py entregar` incluye la comparación en el zip.
+* La revisión de la entrega muestra el 16 de noviembre como incidente documentado (`DIAS_SIN_DATOS` en `corolla/configuracion.py`) y espera cinco correos exportados. Ese día no se rellena con nada.
+* `entrega/comparacion/` y el documento de una página, que lleva los nombres de la pareja, no se suben a GitHub. Van en el zip.
+
+### Pruebas
+* Pasaron de 113 a 119. Las nuevas cubren la comparación con un día común, por año del modelo y sin modificar las bases, un modelo de precios armado con efectos conocidos y la revisión de la entrega con el día perdido.
+
 ## Versión 1.1 · 18 de noviembre de 2026
 
-Corre desde el 19 de noviembre. Commits [6e716d0](https://github.com/estebanjperdomo-cloud/taller2-corolla/commit/6e716d06cff59b532908ae59c3cdf7afe84bcd59) y [a0c0105](https://github.com/estebanjperdomo-cloud/taller2-corolla/commit/a0c0105cab21cd2e5696d548d98eaf83eea2bd6d), más el de esta documentación.
+Corrió del 19 al 21 de noviembre. Commits [6e716d0](https://github.com/estebanjperdomo-cloud/taller2-corolla/commit/6e716d06cff59b532908ae59c3cdf7afe84bcd59) , [a0c0105](https://github.com/estebanjperdomo-cloud/taller2-corolla/commit/a0c0105cab21cd2e5696d548d98eaf83eea2bd6d) y [9b3307a](https://github.com/estebanjperdomo-cloud/taller2-corolla/commit/9b3307a9454213c680b0ef27c1615dd85953794a), el de la documentación.
 
 ### Agregado
 * Mazda 3 y Kia K3 2022 a 2026 como modelos adicionales, leídos de sus páginas públicas en Carroya. Cada uno tiene su carpeta en `datos/modelos/` y su propia base (`mazda_3.sqlite` y `kia_k3.sqlite`).

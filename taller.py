@@ -18,6 +18,7 @@ Cada paso del taller por separado (por defecto en modo prueba)
 Modelos adicionales (Mazda 3 y Kia K3, en configuracion.MODELOS_EXTRA)
   probar-modelos          lee las primeras páginas de cada modelo y muestra qué líneas reconoce
   modelos                 pasos 1, 3 y 6 solo de los modelos adicionales
+  comparar                compara los tres modelos (tabla y gráfica en entrega/comparacion)
 
 Lo que corre solo cada día (paso 4)
   recolectar              8:00, pasos 1, 3 y 6 del Corolla y luego de los modelos adicionales
@@ -431,11 +432,25 @@ def cmd_exportar(args) -> int:
     return 0
 
 
+def cmd_comparar(args) -> int:
+    from corolla import comparacion
+    modo = args.modo or "oficial"
+    resultado = comparacion.comparar(modo, fecha=args.fecha)
+    print(SEPARADOR)
+    for linea in comparacion.texto(resultado):
+        print(linea)
+    print(SEPARADOR)
+    print(f"Tabla, detalle y gráfica en {config.RAIZ_PROYECTO / comparacion.CARPETA}")
+    return 0
+
+
 def cmd_entregar(args) -> int:
-    from corolla.paso8_entrega import empaquetar
+    from corolla.paso8_entrega import empaquetar, notas
     zip_, faltantes = empaquetar()
     print(SEPARADOR)
     print(f"Zip listo en {zip_} ({zip_.stat().st_size / 1e6:.1f} MB).")
+    for linea in notas():
+        print(f"Incidente documentado. {linea}")
     if faltantes:
         print("Todavía falta:")
         for linea in faltantes:
@@ -494,6 +509,8 @@ def construir_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("modelos", parents=[modo], help="pasos 1, 3 y 6 de los modelos adicionales")
     p.add_argument("--max-anuncios", type=int, help="descargar solo N fichas por modelo (prueba rápida)")
     p.set_defaults(funcion=cmd_modelos)
+    sub.add_parser("comparar", parents=[modo, fecha], help="compara el Corolla con los modelos adicionales "
+                   "(por defecto en modo oficial)").set_defaults(funcion=cmd_comparar)
     p = sub.add_parser("probar-modelos", help="qué líneas reconoce en la búsqueda de cada modelo adicional")
     p.add_argument("--paginas", type=int, default=3, help="páginas que se revisan por modelo")
     p.set_defaults(funcion=cmd_probar_modelos)

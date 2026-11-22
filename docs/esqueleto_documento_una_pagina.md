@@ -21,7 +21,7 @@ Inserten `docs/arquitectura.png` a todo el ancho de la página.
 * Gangas. Precio esperado por año, kilometraje y grupo de versión; regla de 12 %, z de menos dos y 8 % frente a comparables; manejo de faltantes; una limitación importante.
 
 ## Comparación entre modelos (una o dos frases)
-Qué muestran el Mazda 3 y el Kia K3 frente al Corolla, por ejemplo la mediana de precio de cada uno o cuánto baja el precio por cada año de antigüedad según el modelo de precios. Aclaren que tienen datos desde el 19 de noviembre.
+Qué muestran el Mazda 3 y el Kia K3 frente al Corolla según `python taller.py comparar`, por ejemplo cuánto más baratos son para el mismo año del modelo o cuánto suma cada año más nuevo. Aclaren que tienen datos desde el 19 de noviembre.
 
 ## Resultados del periodo (una o dos frases)
 Anuncios únicos, días completos, correos enviados y gangas encontradas. Si algo falló, qué pasó (ver `docs/incidentes.md`).

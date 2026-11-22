@@ -12,8 +12,12 @@ Este documento cuenta cómo construimos el monitor, qué cambiamos durante la se
 | 17 de noviembre | Instalamos el monitor y lanzamos la primera recolección oficial con launchd | Desde ese día corre solo |
 | 18 de noviembre | La recolección tardó dos horas porque se cerró la tapa del Mac, y el correo de las 11:00 no salió porque la red del trabajo bloquea el puerto 465 | Enviamos el correo a mano a las 19:23 por el puerto 587 y preparamos la versión 1.1 (decisiones 6 y 7) |
 | 18 de noviembre | Decidimos responder a la sugerencia del profesor de comparar más modelos y marcas | Agregamos el Mazda 3 y el Kia K3 a la versión 1.1 (decisión 8) |
+| 19 de noviembre | La red volvió a bloquear el puerto 465 | El correo salió a las 11:00 por el 587, sin que nadie hiciera nada |
+| 20 de noviembre | A las 11:00 la recolección todavía estaba terminando el Kia K3 | El correo la esperó 80 segundos y salió a las 11:01 |
+| 21 de noviembre | El Mac estuvo cerrado casi toda la mañana | El correo esperó a la recolección y salió a las 12:03, una sola vez |
+| 22 de noviembre | Terminó el periodo | Comparamos los tres modelos (decisión 10) y armamos la entrega, versión 1.2 |
 
-Desde el 19 de noviembre corre la versión 1.1.
+Del 19 al 21 corrió la versión 1.1.
 
 ## Decisiones de la versión 1.0
 
@@ -68,6 +72,8 @@ Las tareas del Mac deciden el modo por la fecha. Antes del 16 todo es prueba, de
 * Una tercera tarea de launchd intenta el correo cada 30 minutos de 11:30 a 23:30, pero solo lo envía si el del día no ha salido.
 * Nunca salen dos correos del mismo día. Antes de enviar, el programa busca en los logs un correo ya enviado con la misma fecha de reporte, y un candado de archivo impide que dos tareas envíen al mismo tiempo.
 
+**Cómo funcionó en la semana.** El 19 la red volvió a rechazar el 465 y el correo salió a las 11:00 por el 587 en el primer intento (`COR-20261119-110006`). Desde la noche del 18 hasta el 21 la tarea de reintento corrió 80 veces cuando el correo del día ya había salido, y las 80 veces lo dejó anotado en su log ("ya se había enviado, no se repite") sin mandar uno repetido.
+
 ### 7. La tapa cerrada y el Mac dormido
 
 **Qué vimos.** La recolección del 18 arrancó a las 8:00 y terminó cerca de dos horas después, porque la tapa se cerró y el Mac se durmió a mitad de camino. `caffeinate` evita que el Mac se duerma por inactividad, pero no puede impedir que se duerma al cerrar la tapa.
@@ -76,6 +82,8 @@ Las tareas del Mac deciden el modo por la fecha. Antes del 16 todo es prueba, de
 * Avisos en la pantalla del Mac cuando empieza la recolección (no cerrar la tapa) y cuando termina (ya se puede cerrar), y uno si el correo no pudo salir.
 * Cuando el Mac se despierta tarde, launchd lanza a la vez las tareas que se perdió. Para que el correo no salga con la recolección a medias, la recolección deja tomado un candado mientras trabaja y el correo la espera hasta una hora.
 * Si una tarea del correo arranca antes de las 11:00, viene del horario del día anterior. En ese caso envía el correo de ayer, solo si no había salido, en lugar de mandar uno de hoy sin datos.
+
+**Cómo funcionó en la semana.** El 20, a las 11:00, la recolección todavía estaba terminando el Kia K3. El correo la esperó 80 segundos y salió a las 11:01 con los tres modelos completos. El 21 el Mac estuvo cerrado casi toda la mañana. La recolección se detuvo mientras dormía, el correo arrancó a las 11:02 y esperó, y cuando se abrió el Mac todo terminó y el correo salió a las 12:03.
 
 **Lo que no resuelve.** Si el Mac pasa el día cerrado, la recolección corre cuando se abra y queda registrada con su hora real. La regla sigue siendo dejar la tapa abierta mientras recolecta.
 
@@ -104,6 +112,25 @@ Las tareas del Mac deciden el modo por la fecha. Antes del 16 todo es prueba, de
 
 La misma noche, al revisar la salida del Mac, vimos que la regla de no repetir el correo identificaba el correo enviado por la fecha del nombre del archivo de log. Esa es la fecha en que corrió, no la del reporte. Si algún día el correo saliera al día siguiente, se habría confundido con el correo de ese nuevo día y lo habría bloqueado. Lo corregimos antes de que pasara (commit `a0c0105`) y agregamos una prueba para ese caso.
 
+## Decisión de la versión 1.2 (22 de noviembre)
+
+### 10. Cómo comparamos los tres carros
+
+**Problema.** Comparar solo el precio mediano de cada modelo engaña. El Kia K3 parece el más barato, pero todos sus anuncios son modelos 2025 y 2026 con poco kilometraje, mientras que la mitad de los Corolla son 2022 y 2023. Hay que comparar carros parecidos.
+
+**Opciones.**
+* Comparar las medianas de cada modelo. Es lo más simple, pero mezcla carros de distintos años.
+* Usar el modelo de precios del paso 6 de cada carro. No se puede comparar directamente, porque cada uno usa los niveles de versión de su marca.
+* Comparar por año del modelo y, además, ajustar un mismo modelo simple a los tres (logaritmo del precio contra año y logaritmo del kilometraje). Es la que escogimos.
+
+**Qué hicimos.** `python taller.py comparar` (`corolla/comparacion.py`) toma el último día que tienen los tres, cuenta cada anuncio una sola vez y calcula para cada modelo el precio mediano por año, el efecto de un año más nuevo y el de duplicar el kilometraje, los cambios de precio del periodo común y las posibles gangas del análisis diario. Solo lee las bases, nunca las modifica, y el zip de la entrega la incluye.
+
+**Qué encontramos el 21 de noviembre.** Para el mismo año del modelo el Corolla es el más caro. El Mazda 3 cuesta entre 4 % (2022) y 16 % (2026) menos y el Kia K3 cerca de 31 % menos (2025 y 2026). Con el mismo kilometraje, cada año más nuevo suma 7,5 % al Corolla y 4,3 % al Mazda 3, y duplicar el kilometraje resta entre 1,5 % y 3,4 % en los tres. En la semana casi nadie cambió su precio. La gráfica y la explicación están en el README.
+
+**Cómo lo comprobamos.** Una prueba arma precios con una regla conocida (5 % por año y una elasticidad de menos 0,04 al kilometraje) y verifica que el programa recupera exactamente esos efectos. Otras pruebas revisan que use el mismo día para los tres, que compare por año y que no modifique las bases. Después lo corrimos sobre los datos reales de la semana.
+
+**Límites.** Es un solo día y algunos años tienen pocos anuncios (cinco Corolla 2024 y cinco 2026). Con solo dos años del Kia K3, su efecto por año no es confiable y el programa lo dice.
+
 ## Cómo decide hoy la tarea del correo
 
 El mismo diagrama está en `docs/flujo_correo.png` para usarlo fuera de GitHub.
@@ -130,7 +157,7 @@ flowchart TD
 ## Cómo usamos el agente de programación
 
 * Claude escribió el código a partir del enunciado y de nuestras decisiones, por ejemplo qué modelos agregar y quedarnos solo con Carroya.
-* Cada cambio llega con pruebas automáticas. Hoy son 113 y corren sin internet con `python -m pytest -q`.
+* Cada cambio llega con pruebas automáticas. Hoy son 119 y corren sin internet con `python -m pytest -q`.
 * Antes de dar un cambio por bueno lo probamos en el Mac (`probar-modelos`, `programar` y `estado-programacion`) y revisamos la salida. Así encontramos el error de la decisión 9.
 * Cada cambio queda en un commit que explica qué cambió y por qué. Los cambios grandes quedan además en [CAMBIOS.md](CAMBIOS.md) y en este documento.
 * Antigravity lee las reglas de [AGENTS.md](AGENTS.md), por ejemplo no tocar `datos/oficial`, correr las pruebas después de cada cambio y anotar aquí las decisiones nuevas.
@@ -140,5 +167,6 @@ flowchart TD
 * El monitor depende de que el Mac esté encendido y con la tapa abierta. Con más tiempo lo pondríamos en un computador que no se mueva de su sitio.
 * El correo depende de que la red deje salir SMTP. La API de Gmail por HTTPS evitaría ese problema.
 * El 16 de noviembre no tiene datos.
-* El Mazda 3 y el Kia K3 tienen datos desde el 19 de noviembre. El Kia K3 tiene unos 38 anuncios, así que sus alertas son menos sólidas que las del Corolla.
+* El Mazda 3 y el Kia K3 tienen datos desde el 19 de noviembre, tres días. El Kia K3 tiene entre 38 y 39 anuncios y solo de dos años, así que sus alertas y su comparación son menos sólidas que las del Corolla.
+* La recolección tardó dos horas o más los días en que el Mac se durmió mientras corría. Los datos son de ese mismo día, pero no de las 8:00 en punto.
 * Los umbrales de la regla de gangas son razonables, no óptimos.

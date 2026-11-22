@@ -179,3 +179,54 @@ def distribucion_precios(validos: pd.DataFrame, stats: dict, fecha: date, ruta: 
 def _desplazamiento(id_anuncio: str) -> float:
     """Pequeño corrimiento horizontal, siempre el mismo para el mismo anuncio."""
     return (zlib.crc32(str(id_anuncio).encode()) % 1000) / 1000 * 0.4 - 0.2
+
+
+# --- Comparación entre modelos -----------------------------------------------------------------
+# Los tres primeros colores de la paleta validada, siempre en este orden (azul, naranja, aguamarina).
+AGUAMARINA = "#1baf7a"
+COLORES_MODELOS = (AZUL, NARANJA, AGUAMARINA)
+
+
+def comparacion_por_anio(resultado: dict, ruta: Path) -> Path:
+    """Precio mediano según el año del modelo, una línea por modelo (corolla/comparacion.py)."""
+    modelos = [m for m in resultado["modelos"] if m.get("por_anio")]
+    anios = sorted({int(a) for m in modelos for a in m["por_anio"]})
+    dia = date.fromisoformat(resultado["dia"])
+    with plt.rc_context({"font.family": "sans-serif", "font.sans-serif": FUENTES}):
+        figura = plt.figure(figsize=(6.4, 3.7), dpi=200, facecolor=FONDO)
+        ax = figura.add_axes([0.1, 0.13, 0.66, 0.6])
+        _estilo_ejes(ax)
+        figura.text(0.1, 0.965, "Precio mediano según el año del modelo", fontsize=12,
+                    fontweight="semibold", color=TINTA, ha="left", va="top")
+        figura.text(0.1, 0.89, f"Anuncios publicados en Carroya el {config.fecha_larga(dia)} · millones de pesos",
+                    fontsize=8.5, color=TINTA_2, ha="left", va="top")
+        leyenda = []
+        for modelo, color in zip(modelos, COLORES_MODELOS):
+            puntos = sorted((int(a), v["mediana"] / 1e6) for a, v in modelo["por_anio"].items())
+            xs, ys = zip(*puntos)
+            ax.plot(xs, ys, color=color, linewidth=1.8, solid_capstyle="round", solid_joinstyle="round", zorder=3)
+            ax.scatter(xs, ys, s=34, color=color, edgecolors=FONDO, linewidths=1.6, zorder=4)
+            # Etiqueta directa al final de cada línea, en tinta neutra (el punto de color da la identidad)
+            ax.annotate(f"{modelo['modelo']}  {formato.decimal(ys[-1], 1)} M", (xs[-1], ys[-1]),
+                        xytext=(9, 0), textcoords="offset points", fontsize=8, color=TINTA,
+                        va="center", ha="left", annotation_clip=False, zorder=5)
+            leyenda.append(Line2D([], [], color=color, linewidth=1.8, marker="o", markersize=5,
+                                  markeredgecolor=FONDO, label=modelo["modelo"]))
+        ax.set_xticks(anios, [str(a) for a in anios])
+        ax.set_xlim(anios[0] - 0.3, anios[-1] + 0.3)
+        ax.yaxis.set_major_formatter(FuncFormatter(_en_millones))
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
+        ax.legend(handles=leyenda, loc="lower left", fontsize=7.5, frameon=False, ncol=len(leyenda),
+                  handletextpad=0.4, columnspacing=1.2, bbox_to_anchor=(-0.01, 1.0), borderaxespad=0.2)
+        nota = "Cada punto es la mediana de los anuncios de ese año del modelo."
+        for modelo in modelos:
+            propios = sorted(int(a) for a in modelo["por_anio"])
+            if len(propios) < len(anios):
+                lista = " y ".join([", ".join(map(str, propios[:-1])), str(propios[-1])]) if len(propios) > 1 \
+                    else str(propios[0])
+                nota += f" El {modelo['modelo']} solo tiene modelos {lista}."
+        figura.text(0.1, 0.025, nota, fontsize=7, color=TENUE, ha="left", va="bottom")
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        figura.savefig(ruta, dpi=200, facecolor=FONDO)
+        plt.close(figura)
+    return ruta

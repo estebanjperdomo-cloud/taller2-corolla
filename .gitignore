@@ -13,11 +13,14 @@ __pycache__/
 # Datos que produce el programa. Se quedan en el Mac que ejecuta el monitor.
 datos/
 
-# Lo que genera "python taller.py entregar".
-# Los correos recibidos (entrega/correos_recibidos) y el documento de una página sí se suben.
+# Lo que genera "python taller.py entregar". La gráfica de la comparación está copiada en docs/.
 entrega/base_consolidada/
 entrega/logs/
 entrega/programacion/
+entrega/comparacion/
+
+# El documento de una página lleva los nombres de la pareja. Va solo en el zip de Bloque Neón.
+entrega/documento_una_pagina.pdf
 *.zip
 *.tmp
 

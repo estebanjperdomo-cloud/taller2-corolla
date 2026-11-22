@@ -476,7 +476,7 @@ Guarden ese correo como PDF en `entrega/correos_prueba/` (cómo se hace está en
 * **Antes de dormir.** Mac conectado, tapa abierta, sesión iniciada y wifi encendido.
 * **En la mañana, si se llevan el Mac.** A las 8:00 sale el aviso "Empezó la recolección del día". No cierren la tapa hasta que salga el aviso "Terminó la recolección... Ya puedes cerrar la tapa" (puede tardar media hora). Con la tapa cerrada el Mac se duerme y la recolección se detiene hasta que lo abran.
 * **A las 8:30 o cuando puedan.** La Persona A revisa con los comandos de abajo que la recolección corrió. Debe aparecer una ejecución `REC-<fecha>-08...` con la etapa `ejecucion_completa` en `ok` o `con_advertencias`. También pueden escribir `/revisar-dia` en Antigravity.
-* **A las 11:10.** Los dos revisan que llegó el correo (sin `[PRUEBA]` en el asunto). Si a las 11:00 el Mac estaba cerrado o la red no dejó enviar, el correo sale solo apenas el Mac esté abierto y con una red que lo permita, en el siguiente reintento (cada 30 minutos, hasta las 23:30). Ese mismo día lo exportan como PDF a `entrega/correos_recibidos/correo_2026-11-DD.pdf` (parte 6.1) y lo suben a GitHub, así al final no hay que buscarlos.
+* **A las 11:10.** Los dos revisan que llegó el correo (sin `[PRUEBA]` en el asunto). Si a las 11:00 el Mac estaba cerrado o la red no dejó enviar, el correo sale solo apenas el Mac esté abierto y con una red que lo permita, en el siguiente reintento (cada 30 minutos, hasta las 23:30). Ese mismo día lo exportan como PDF a `entrega/correos_recibidos/correo_2026-11-DD.pdf` (parte 6.1), así al final no hay que buscarlos. Esa carpeta no se sube a GitHub porque los correos tienen sus direcciones, y llega a Bloque Neón dentro del zip.
 * **Si algo falló**, sigan la tabla y anoten lo que pasó en `docs/incidentes.md`.
 
 ```bash
@@ -585,13 +585,13 @@ Para cada paso está lo que pide el enunciado, dónde está el código, cómo fu
 
 ## Parte 6. Entrega en Bloque Neón
 
-### 6.1 Exportar los seis correos recibidos
+### 6.1 Exportar los correos recibidos
 
-En Gmail, en el navegador, abran el correo de cada día, opriman los tres puntos junto a Responder, escojan Imprimir y en el cuadro de impresión escojan Guardar como PDF. El PDF conserva la fecha y la hora del correo. Guárdenlos con estos nombres en `~/taller2-corolla/entrega/correos_recibidos/`.
+En Gmail, en el navegador, abran el correo de cada día, opriman los tres puntos junto a Responder, escojan Imprimir y en el cuadro de impresión escojan Guardar como PDF. El PDF conserva la fecha y la hora del correo. Guárdenlos con estos nombres en `~/taller2-corolla/entrega/correos_recibidos/`. El 16 no tiene correo porque ese día el monitor no estaba instalado, y está contado en `docs/incidentes.md`.
 
 ```
-correo_2026-11-16.pdf  correo_2026-11-17.pdf  correo_2026-11-18.pdf
-correo_2026-11-19.pdf  correo_2026-11-20.pdf  correo_2026-11-21.pdf
+correo_2026-11-17.pdf  correo_2026-11-18.pdf  correo_2026-11-19.pdf
+correo_2026-11-20.pdf  correo_2026-11-21.pdf
 ```
 
 ### 6.2 Quitar la programación y devolver la energía como estaba (domingo 22)
@@ -604,7 +604,9 @@ sudo pmset repeat cancel
 
 Devuelvan el reposo al valor que anotaron en la parte 3.1 (por ejemplo `sudo pmset -c sleep 10`) y vuelvan a activar las actualizaciones automáticas.
 
-### 6.3 Documento de una página
+### 6.3 Comparación de los tres modelos y documento de una página
+
+`python taller.py comparar` muestra la comparación del Corolla con el Mazda 3 y el Kia K3 y guarda la tabla y la gráfica en `entrega/comparacion/`. El zip la incluye sola.
 
 Partan de `docs/esqueleto_documento_una_pagina.md`, que dice qué poner en cada bloque. Escríbanlo con sus palabras en Google Docs o Word, inserten `docs/arquitectura.png`, revisen que quepa en una página y expórtenlo como `entrega/documento_una_pagina.pdf`. Si algún día falló, cuéntenlo en una frase usando `docs/incidentes.md`.
 
@@ -618,13 +620,13 @@ git pull
 python taller.py entregar
 ```
 
-Sale el tamaño del zip y la lista de lo que falta. Corrijan y repitan hasta que diga `La lista de revisión está completa.` Revisen el contenido.
+Sale el tamaño del zip, el 16 como incidente documentado y la lista de lo que falta. Corrijan y repitan hasta que diga `La lista de revisión está completa.` Revisen el contenido.
 
 ```bash
 unzip -l entrega_taller2_corolla.zip | less
 ```
 
-(Q para salir.) No debe aparecer `.env`. Deben estar `datos/oficial` con los seis días, `datos/prueba`, `datos/launchd`, `entrega/` y el código.
+(Q para salir.) No debe aparecer `.env`. Deben estar `datos/oficial` con los días del 17 al 21, `datos/modelos`, `datos/prueba`, `datos/launchd`, `entrega/` con la comparación y el código.
 
 ### 6.5 Subir
 

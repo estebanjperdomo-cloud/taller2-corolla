@@ -14,8 +14,37 @@ El enunciado pide usar un coding agent para desarrollar la solución y poder exp
 |---|---|---|
 | 1.0 | 14 de noviembre | Monitor del Corolla, con la recolección a las 8:00 y el correo a las 11:00 |
 | 1.1 | 18 de noviembre | Mazda 3 y Kia K3 como modelos adicionales, y un correo que llega aunque la red bloquee un puerto o el Mac haya estado dormido |
+| 1.2 | 22 de noviembre | Comparación de los tres modelos y cierre del periodo |
 
 La historia completa está en [DECISIONES.md](DECISIONES.md), con el problema que motivó cada decisión, las opciones que se descartaron y cómo se comprobó cada cambio. La lista de cambios por versión está en [CAMBIOS.md](CAMBIOS.md) y las fallas del periodo en [docs/incidentes.md](docs/incidentes.md).
+
+## Resultados del periodo
+
+| Día | Anuncios del Corolla | Nuevos | Posibles gangas | Correo |
+|---|---|---|---|---|
+| Lunes 16 | Sin datos, el monitor todavía no estaba instalado | | | No salió |
+| Martes 17 | 60 | 60 (primer día) | 1 | 12:09, el día de la instalación |
+| Miércoles 18 | 60 | 0 | 1 | 19:23, a mano por el puerto 587 |
+| Jueves 19 | 61 | 2 | 1 | 11:00, por el puerto 587 sin intervención |
+| Viernes 20 | 61 (una ficha no se descargó) | 0 | 1 | 11:01, después de esperar 80 segundos a la recolección |
+| Sábado 21 | 61 | 0 | 1 | 12:03, después de esperar a la recolección con el Mac cerrado |
+
+En total el sistema vio 62 anuncios distintos del Corolla. La posible ganga fue la misma los cinco días, un Corolla 2024 híbrido en Medellín publicado en $95,9 millones cuando el modelo de precios esperaba unos $119,8 millones. Ningún Corolla cambió de precio en la semana. Desde el 19 el sistema siguió además 101 anuncios del Mazda 3 y entre 38 y 39 del Kia K3, sin posibles gangas. Los detalles de cada día están en [docs/incidentes.md](docs/incidentes.md).
+
+## Comparación entre modelos
+
+`python taller.py comparar` pone a los tres modelos lado a lado con las mismas reglas. Usa el mismo día para todos (el último que tienen los tres), compara los precios por año del modelo y mide el efecto del año y del kilometraje con un mismo modelo simple para los tres. Escribe la tabla, el detalle y la gráfica en `entrega/comparacion/`.
+
+![Precio mediano según el año del modelo, 21 de noviembre de 2026](docs/comparacion_modelos.png)
+
+* Para el mismo año del modelo el Corolla es el más caro. El Mazda 3 cuesta entre 4 % (modelo 2022) y 16 % (modelo 2026) menos, y el Kia K3 cerca de 31 % menos en 2025 y 2026.
+* La distancia con el Mazda 3 crece en los modelos más nuevos. Con el mismo kilometraje, cada año más nuevo suma 7,5 % al precio del Corolla y 4,3 % al del Mazda 3. Dicho al revés, el Corolla pierde más precio por cada año de antigüedad.
+* El kilometraje pesa poco frente al año. Duplicarlo baja el precio 1,5 % en el Corolla, 2,7 % en el Mazda 3 y 3,4 % en el Kia K3.
+* Los precios casi no se mueven. En los tres días comunes hubo una sola bajada de precio, en un Kia K3, y ninguna en el Corolla ni en el Mazda 3.
+* El 90 % de los Corolla publicados son híbridos, contra 45 % de los Mazda 3 (híbridos desde los modelos 2023) y ninguno de los Kia K3.
+* En Carroya solo hay Kia K3 modelos 2025 y 2026, así que su comparación vale solo para esos dos años y su efecto por año no es confiable.
+
+Es una comparación descriptiva de un solo día, con pocos anuncios en algunos años (cinco Corolla 2024 y cinco 2026). Sirve para ubicar al Corolla frente a sus competidores, no para predecir precios.
 
 ## Arquitectura
 
@@ -54,6 +83,7 @@ Todo se hace con `python taller.py <comando>`. Los comandos manuales trabajan en
 | `recolectar` | Lo de las 8:00, pasos 1, 3 y 6 del Corolla y después de los modelos adicionales (`--solo-corolla` los omite) |
 | `correo` | Lo de las 11:00, paso 7. Con `--programado` no repite un correo que ya salió |
 | `modelos` | Pasos 1, 3 y 6 solo de los modelos adicionales |
+| `comparar` | Compara los tres modelos el último día común (tabla, detalle y gráfica en `entrega/comparacion/`) |
 | `probar-modelos` | Lee las primeras páginas de cada modelo adicional y muestra qué anuncios reconoce |
 | `programar`, `estado-programacion`, `probar-programacion`, `desprogramar` | Tareas del Mac (recolección, correo y reintentos del correo) |
 | `reconstruir` | Rehace la base desde los archivos diarios |
@@ -259,7 +289,7 @@ Si alguna ejecución falló, la evidencia queda en el log, en el archivo de esta
 
 ## Pruebas
 
-`pytest -q` corre 112 pruebas sin internet. Cubren la extracción con respuestas que tienen la misma forma de la API de Carroya, los estados de descarga, la búsqueda incompleta, la idempotencia de la consolidación, la reconstrucción de la base, el análisis de gangas, el correo en curso y sin datos, el envío con un servidor SMTP falso, las tareas de launchd, el modo según la fecha, el navegador de respaldo, la entrega sin credenciales, los modelos adicionales en carpetas separadas, el cambio al puerto 587, los reintentos sin correos repetidos y la espera del correo a la recolección. Una de ellas levanta un Carroya de mentira en el propio computador y prueba el navegador real contra él.
+`python -m pytest -q` corre 119 pruebas sin internet. Cubren la extracción con respuestas que tienen la misma forma de la API de Carroya, los estados de descarga, la búsqueda incompleta, la idempotencia de la consolidación, la reconstrucción de la base, el análisis de gangas, el correo en curso y sin datos, el envío con un servidor SMTP falso, las tareas de launchd, el modo según la fecha, el navegador de respaldo, la entrega sin credenciales, los modelos adicionales en carpetas separadas, el cambio al puerto 587, los reintentos sin correos repetidos, la espera del correo a la recolección, la comparación entre modelos y la revisión de la entrega. Una de ellas levanta un Carroya de mentira en el propio computador y prueba el navegador real contra él.
 
 `python taller.py demo` simula seis días con anuncios nuevos, anuncios que salen, bajadas de precio, fallas de descarga y una búsqueda incompleta, y deja todo en `datos/demo` con `[DEMO]` en el asunto de los correos.
 
@@ -290,5 +320,5 @@ datos/                     se crea al ejecutar (no se sube a GitHub)
     logs/                  logs por ejecución y workflow.log
   modelos/<modelo>/<modo>/ lo mismo para cada modelo adicional (mazda-3, kia-k3)
   launchd/                 salida de las tareas programadas del Mac
-entrega/                   lo que se agrega a mano y lo que genera "entregar"
+entrega/                   lo que se agrega a mano y lo que genera "entregar" (con la comparación de modelos)
 ```

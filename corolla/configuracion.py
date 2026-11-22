@@ -54,6 +54,11 @@ PAUSA_ENTRE_PAGINAS_S = (1.5, 3.5)     # pausa amable entre una página y otra
 TIEMPO_LIMITE_MS = 45_000
 GUARDAR_CADA = 10                      # guardar el progreso cada N descargas
 ESPERA_INTERNET_MAX_S = 600            # al despertar, el Mac puede tardar en conectarse al wifi
+# Días del periodo oficial sin recolección, contados en docs/incidentes.md. La revisión de la
+# entrega los muestra como incidente documentado y no como algo que falta. Nunca se rellenan.
+DIAS_SIN_DATOS = {
+    date(2026, 11, 16): "el monitor todavía no estaba instalado",
+}
 ESPERA_RECOLECCION_MAX_S = 3600        # el correo programado espera hasta una hora a la recolección
 ESPERA_RECOLECCION_GRACIA_S = 120      # y dos minutos si la recolección todavía no ha arrancado
 
@@ -186,10 +191,12 @@ def carpeta_datos() -> Path:
     return Path(os.environ.get("COROLLA_DATOS", RAIZ_PROYECTO / "datos"))
 
 
-def rutas_modelo(busqueda: "Busqueda", modo: str) -> "Rutas":
+def rutas_modelo(busqueda: "Busqueda", modo: str, raiz: Path | None = None) -> "Rutas":
     """Carpetas de un modelo adicional, separadas del Corolla, en datos/modelos/<clave>/<modo>/.
-    Su base lleva el nombre del modelo (mazda_3.sqlite, kia_k3.sqlite)."""
-    return Rutas(modo, carpeta_datos() / "modelos" / busqueda.clave, f"{busqueda.clave.replace('-', '_')}.sqlite")
+    Su base lleva el nombre del modelo (mazda_3.sqlite, kia_k3.sqlite). 'raiz' es la carpeta
+    datos/ (por defecto la del proyecto)."""
+    return Rutas(modo, (raiz or carpeta_datos()) / "modelos" / busqueda.clave,
+                 f"{busqueda.clave.replace('-', '_')}.sqlite")
 
 
 @dataclass(frozen=True)
